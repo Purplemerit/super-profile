@@ -25,6 +25,13 @@ export default function ListProductFlow({
 
    const [isPublishing, setIsPublishing] = useState(false);
    const [publishingStep, setPublishingStep] = useState(0);
+   const [currentHost, setCurrentHost] = useState("");
+
+   useEffect(() => {
+      if (typeof window !== "undefined") {
+         setCurrentHost(window.location.origin);
+      }
+   }, []);
 
    const handlePublish = async () => {
       setIsPublishing(true);
@@ -36,7 +43,7 @@ export default function ListProductFlow({
       }
 
       // SAVE DATA FOR PERSISTENCE
-      const slug = formData.title?.toLowerCase().replace(/[^a-z0-9]/g, '-') || "my-collection";
+      const slug = formData.customPageUrl || formData.title?.toLowerCase().replace(/[^a-z0-9]/g, '-') || "my-collection";
       localStorage.setItem(`website_${slug}`, JSON.stringify(formData));
 
       // Update Dashboard List
@@ -110,11 +117,11 @@ export default function ListProductFlow({
                         target="_blank"
                         className="flex-1 px-6 py-4 font-bold text-blue-600 text-[14px] overflow-hidden text-ellipsis whitespace-nowrap hover:underline decoration-2 underline-offset-4"
                      >
-                        superprofile.bio/p/{slug}
+                        {currentHost.replace(/^https?:\/\//, '')}/p/{slug}
                      </a>
                      <button
                         onClick={() => {
-                           navigator.clipboard.writeText(`https://superprofile.bio/p/${slug}`);
+                           navigator.clipboard.writeText(`${currentHost}/p/${slug}`);
                         }}
                         className="px-6 py-4 bg-white rounded-[24px] font-black text-[12px] shadow-sm hover:bg-gray-50 transition-all active:scale-95 flex items-center gap-2 group border border-gray-100"
                      >
