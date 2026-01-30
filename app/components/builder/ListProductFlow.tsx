@@ -1,0 +1,635 @@
+"use client";
+
+import { X, ChevronDown, Check, Upload, Bold, Italic, Underline, AlignLeft, List as ListIcon, Trash2, Edit3, Globe, Copy, Info, RefreshCw, Plus } from "lucide-react";
+import { useState, useEffect } from "react";
+import { FormData, Product } from "@/lib/types";
+
+interface ListProductFlowProps {
+   formData: FormData;
+   setFormData: (data: any) => void;
+   step: number;
+   subStep: number;
+   onNext: () => void;
+   onBack: () => void;
+   onCancel: () => void;
+   isLive: boolean;
+   setIsLive: (val: boolean) => void;
+   setSubStep: (val: number) => void;
+   setStep: (val: number) => void;
+}
+
+export default function ListProductFlow({
+   formData, setFormData, step, subStep, onNext, onBack, onCancel, isLive, setIsLive, setSubStep
+}: ListProductFlowProps) {
+   // subStep is handled by parent now
+
+   const [isPublishing, setIsPublishing] = useState(false);
+   const [publishingStep, setPublishingStep] = useState(0);
+
+   const handlePublish = async () => {
+      setIsPublishing(true);
+      const steps = ["Optimizing product list...", "Generating collection page...", "Securing checkout flows...", "Publishing to global CDN..."];
+
+      for (let i = 0; i < steps.length; i++) {
+         setPublishingStep(i);
+         await new Promise(resolve => setTimeout(resolve, 800));
+      }
+
+      // SAVE DATA FOR PERSISTENCE
+      const slug = formData.title?.toLowerCase().replace(/[^a-z0-9]/g, '-') || "my-collection";
+      localStorage.setItem(`website_${slug}`, JSON.stringify(formData));
+
+      // Update Dashboard List
+      const existingList = JSON.parse(localStorage.getItem('websites_list') || '[]');
+      const websiteEntry = {
+         title: formData.title || "Untitled Collection",
+         price: `₹${formData.price || "0"}`,
+         sale: "0",
+         revenue: "₹0",
+         status: "Active", // Correct status for Published filter
+         image: "https://images.unsplash.com/photo-1544256718-3bcf237f3974?q=80&w=2371",
+         lastModified: "Just now",
+         slug: slug,
+         type: "list"
+      };
+
+      const updatedList = [websiteEntry, ...existingList.filter((site: any) => site.slug !== slug)];
+      localStorage.setItem('websites_list', JSON.stringify(updatedList));
+
+      setIsPublishing(false);
+      setIsLive(true);
+   };
+
+   if (isPublishing) {
+      const steps = ["Optimizing product list...", "Generating collection page...", "Securing checkout flows...", "Publishing to global CDN..."];
+      return (
+         <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center p-12 overflow-hidden font-sans">
+            <div className="relative w-full max-w-lg flex flex-col items-center">
+               <div className="w-24 h-24 mb-10 relative">
+                  <div className="absolute inset-0 border-4 border-gray-100 rounded-full" />
+                  <div className="absolute inset-0 border-4 border-black rounded-full border-t-transparent animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                     <RefreshCw className="text-black animate-pulse" size={32} />
+                  </div>
+               </div>
+
+               <div className="space-y-4 text-center">
+                  <h2 className="text-3xl font-black text-gray-900 tracking-tight">Publishing Page</h2>
+                  <div className="flex flex-col items-center gap-3">
+                     <p className="text-gray-400 font-bold text-lg animate-pulse">{steps[publishingStep]}</p>
+                     <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                           className="h-full bg-black transition-all duration-500 rounded-full"
+                           style={{ width: `${((publishingStep + 1) / steps.length) * 100}%` }}
+                        />
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </div>
+      );
+   }
+
+   if (isLive) {
+      const slug = formData.title?.toLowerCase().replace(/[^a-z0-9]/g, '-') || "my-collection";
+      return (
+         <div className="fixed inset-0 z-[100] bg-white animate-in fade-in duration-500 flex flex-col items-center justify-center p-12">
+            <div className="max-w-xl w-full flex flex-col items-center text-center space-y-8 py-12">
+               <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                  <Check className="text-green-600" size={40} strokeWidth={3} />
+               </div>
+               <div className="space-y-4">
+                  <h1 className="text-[40px] font-black tracking-tighter leading-[1] text-gray-900 font-sans">Your collection is live!</h1>
+                  <p className="text-gray-400 font-bold text-lg leading-relaxed max-w-sm mx-auto">Awesome! Your product list has been successfully published and is ready to share.</p>
+               </div>
+               <div className="w-full space-y-3 pt-4">
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest text-center">Public URL</p>
+                  <div className="flex items-center p-1.5 bg-gray-50 rounded-[30px] border border-gray-100 shadow-inner group/url">
+                     <a
+                        href={`/p/${slug}`}
+                        target="_blank"
+                        className="flex-1 px-6 py-4 font-bold text-blue-600 text-[14px] overflow-hidden text-ellipsis whitespace-nowrap hover:underline decoration-2 underline-offset-4"
+                     >
+                        superprofile.bio/p/{slug}
+                     </a>
+                     <button
+                        onClick={() => {
+                           navigator.clipboard.writeText(`https://superprofile.bio/p/${slug}`);
+                        }}
+                        className="px-6 py-4 bg-white rounded-[24px] font-black text-[12px] shadow-sm hover:bg-gray-50 transition-all active:scale-95 flex items-center gap-2 group border border-gray-100"
+                     >
+                        <Copy size={16} className="text-gray-400 group-hover:text-black" /> Copy
+                     </button>
+                  </div>
+               </div>
+               <div className="flex w-full gap-4 pt-6">
+                  <button
+                     onClick={() => window.open(`/p/${slug}`, '_blank')}
+                     className="flex-1 bg-black text-white py-5 rounded-[30px] font-black text-base shadow-xl hover:opacity-90 transition-all flex items-center justify-center gap-3"
+                  >
+                     <Globe size={20} /> Preview
+                  </button>
+                  <button onClick={() => setIsLive(false)} className="px-10 py-5 bg-white border border-gray-100 rounded-[30px] font-black text-base shadow-sm hover:bg-gray-50 flex items-center justify-center gap-2 text-gray-700">
+                     <Edit3 size={20} /> Edit
+                  </button>
+               </div>
+               <button
+                  onClick={() => {
+                     setIsLive(false);
+                     onCancel();
+                  }}
+                  className="text-[12px] font-black text-gray-300 hover:text-black transition-all uppercase tracking-[0.2em] pt-8"
+               >
+                  Done, Back to Home
+               </button>
+            </div>
+         </div>
+      );
+   }
+
+   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+      const file = e.target.files?.[0];
+      if (file) {
+         const reader = new FileReader();
+         reader.onloadend = () => {
+            setFormData({ ...formData, [field]: reader.result as string });
+         };
+         reader.readAsDataURL(file);
+      }
+   };
+
+   return (
+      <div className="min-h-screen bg-[#FDFDFD] text-[#1A1A1A] font-sans">
+         {/* Header */}
+         <header className="fixed top-0 left-0 right-0 h-20 bg-white border-b border-gray-100 flex items-center justify-between px-10 z-50">
+            <div className="flex items-center gap-4">
+               <span className="text-[14px] font-black text-gray-900">New Page</span>
+            </div>
+            <div className="flex items-center gap-6">
+               <div className="flex items-center gap-1.5">
+                  <div className="flex gap-1">
+                     {[1, 2, 3].map(i => (
+                        <div key={i} className={`w-1.5 h-1.5 rounded-full ${step === i ? "bg-black" : "bg-gray-200"}`} />
+                     ))}
+                  </div>
+                  <span className="text-[12px] font-black text-gray-900 ml-2">Step {step} - {step === 1 ? "Page" : step === 2 ? "Checkout" : "Settings"}</span>
+               </div>
+               <button onClick={handlePublish} className="bg-black text-white px-6 py-2.5 rounded-full text-[13px] font-bold hover:bg-gray-800 transition-all">
+                  Publish page
+               </button>
+               <button onClick={onCancel} className="p-2 hover:bg-gray-50 rounded-full transition-all">
+                  <X size={20} className="text-gray-400" />
+               </button>
+            </div>
+         </header>
+
+         <main className="pt-32 pb-40 px-6 max-w-4xl mx-auto flex flex-col items-center">
+            {step === 1 ? (
+               <div className="w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {/* Title Section */}
+                  <div className="space-y-3">
+                     <div className="flex justify-between items-baseline">
+                        <label className="text-[14px] font-black text-gray-900">Website Page Title</label>
+                     </div>
+                     <div className="relative">
+                        <input
+                           className="w-full px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black transition-all shadow-sm"
+                           value={formData.title}
+                           onChange={e => setFormData({ ...formData, title: e.target.value })}
+                           placeholder="Website Page Title"
+                        />
+                        <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[12px] font-bold text-gray-300">28/60</span>
+                     </div>
+                  </div>
+
+                  {/* Category Section */}
+                  <div className="space-y-3">
+                     <label className="text-[14px] font-black text-gray-900">Category</label>
+                     <div className="relative group">
+                        <select
+                           className="w-full px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black transition-all shadow-sm appearance-none cursor-pointer"
+                           value={formData.category}
+                           onChange={e => setFormData({ ...formData, category: e.target.value })}
+                        >
+                           <option value="" disabled>Select a category</option>
+                           <option value="digital">Digital Product</option>
+                           <option value="service">Services</option>
+                           <option value="course">Online Course</option>
+                        </select>
+                        <ChevronDown size={18} className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-black transition-colors" />
+                     </div>
+                  </div>
+
+                  {/* Cover Image Section */}
+                  <div className="space-y-3">
+                     <label className="text-[14px] font-black text-gray-900">Cover Image</label>
+                     <input
+                        type="file"
+                        id="coverImageInput"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, 'coverImage')}
+                     />
+                     <div
+                        onClick={() => document.getElementById('coverImageInput')?.click()}
+                        className="w-full border-2 border-dashed border-gray-200 rounded-[32px] p-6 bg-white flex flex-col items-center justify-center gap-4 hover:border-black transition-all cursor-pointer group relative overflow-hidden min-h-[240px]"
+                     >
+                        {formData.coverImage ? (
+                           <img src={formData.coverImage} className="absolute inset-0 w-full h-full object-cover" alt="Cover" />
+                        ) : (
+                           <>
+                              <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
+                                 <Upload size={24} className="text-gray-400" />
+                              </div>
+                              <div className="text-center">
+                                 <p className="text-[14px] font-black text-gray-900">Upload Image</p>
+                                 <p className="text-[11px] font-bold text-gray-400 mt-1">Recommending 1250px x 1204 or up to 10 mb</p>
+                              </div>
+                           </>
+                        )}
+                        <div className="flex items-center gap-4 w-full max-w-sm mt-4 z-10">
+                           <div className="h-[1px] flex-1 bg-gray-100" />
+                           <span className="text-[11px] font-black text-gray-300">Or</span>
+                           <div className="h-[1px] flex-1 bg-gray-100" />
+                        </div>
+                        <div className="flex items-center gap-2 w-full max-w-sm bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 z-10 backdrop-blur-sm" onClick={e => e.stopPropagation()}>
+                           <input className="flex-1 bg-transparent px-4 py-2 text-[12px] font-bold outline-none" placeholder="Add the link" />
+                           <button className="px-5 py-2.5 bg-white border border-gray-100 rounded-xl text-[11px] font-black shadow-sm">Add Link</button>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Description Section */}
+                  <div className="space-y-3">
+                     <label className="text-[14px] font-black text-gray-900">Description</label>
+                     <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+                        <div className="flex items-center gap-4 px-4 py-3 border-b border-gray-100 bg-gray-50/30">
+                           <div className="flex items-center border-r border-gray-100 pr-4 gap-1">
+                              <button className="p-1.5 hover:bg-white rounded transition-all"><AlignLeft size={16} className="text-gray-400" /></button>
+                              <ChevronDown size={14} className="text-gray-400" />
+                           </div>
+                           <div className="flex items-center gap-1">
+                              <button className="p-1.5 hover:bg-white rounded transition-all"><Bold size={16} className="text-gray-400" /></button>
+                              <button className="p-1.5 hover:bg-white rounded transition-all"><Italic size={16} className="text-gray-400" /></button>
+                              <button className="p-1.5 hover:bg-white rounded transition-all"><Underline size={16} className="text-gray-400" /></button>
+                           </div>
+                        </div>
+                        <textarea
+                           className="w-full h-48 px-6 py-5 text-[14px] font-bold outline-none border-none resize-none placeholder:text-gray-200 font-sans"
+                           placeholder="Add description..."
+                           value={formData.description}
+                           onChange={e => setFormData({ ...formData, description: e.target.value })}
+                        />
+                     </div>
+                  </div>
+               </div>
+            ) : step === 2 ? (
+               <div className="w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {/* Stepper for Step 2 */}
+                  <div className="w-full bg-white border border-gray-100 rounded-[32px] p-8 shadow-sm space-y-10">
+                     <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-12">
+                           <div className="flex items-center gap-3 group transition-all">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black transition-all ${subStep >= 1 ? "bg-blue-600/10 text-blue-600 border border-blue-600/20 shadow-inner" : "bg-gray-50 text-gray-400"}`}>1</div>
+                              <span className={`text-[14px] font-black transition-all ${subStep === 1 ? "text-blue-600 underline underline-offset-8" : "text-gray-400"}`}>Digital Files | 1 media</span>
+                           </div>
+                           <div className="flex items-center gap-3 group transition-all">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black transition-all ${subStep >= 2 ? "bg-blue-600/10 text-blue-600 border border-blue-600/20 shadow-inner" : "bg-gray-50 text-gray-400"}`}>2</div>
+                              <span className={`text-[14px] font-black transition-all ${subStep === 2 ? "text-blue-600 underline underline-offset-8" : "text-gray-400"}`}>Product Details</span>
+                           </div>
+                           <div className="flex items-center gap-3 group transition-all">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black transition-all ${subStep >= 3 ? "bg-blue-600/10 text-blue-600 border border-blue-600/20 shadow-inner" : "bg-gray-50 text-gray-400"}`}>3</div>
+                              <span className={`text-[14px] font-black transition-all ${subStep === 3 ? "text-blue-600 underline underline-offset-8" : "text-gray-400"}`}>Price Fixing</span>
+                           </div>
+                        </div>
+                     </div>
+
+                     {subStep === 1 && (
+                        <div className="space-y-8 animate-in fade-in duration-300">
+                           <div className="space-y-4">
+                              <div className="flex items-center gap-3">
+                                 <div className="w-6 h-6 rounded-full border border-gray-100 flex items-center justify-center text-[10px] font-black bg-white shadow-sm">1</div>
+                                 <label className="text-[14px] font-black text-gray-900">What Is Payment Page for ?</label>
+                              </div>
+                              <div className="relative group">
+                                 <select
+                                    className="w-full px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black transition-all shadow-sm appearance-none cursor-pointer"
+                                    value={formData.paymentPageFor || "digital"}
+                                    onChange={e => setFormData({ ...formData, paymentPageFor: e.target.value })}
+                                 >
+                                    <option value="link">Website Link</option>
+                                    <option value="digital">Single or multiple digital files</option>
+                                 </select>
+                                 <ChevronDown size={18} className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none transition-colors group-hover:text-black" />
+                              </div>
+                           </div>
+
+                           {formData.paymentPageFor === 'link' ? (
+                              <div className="space-y-3">
+                                 <label className="text-[13px] font-black text-gray-900 ml-9">URL</label>
+                                 <input
+                                    className="w-full ml-9 w-[calc(100%-36px)] px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black transition-all shadow-sm"
+                                    placeholder="Add Website Link"
+                                    value={formData.websiteLink}
+                                    onChange={e => setFormData({ ...formData, websiteLink: e.target.value })}
+                                 />
+                              </div>
+                           ) : (
+                              <div className="space-y-3">
+                                 <label className="text-[13px] font-black text-gray-900 ml-9">Cover Image</label>
+                                 <input
+                                    type="file"
+                                    id="digitalFileImageInput"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) => handleImageUpload(e, 'digitalFilesImage')}
+                                 />
+                                 <div
+                                    onClick={() => document.getElementById('digitalFileImageInput')?.click()}
+                                    className="ml-9 w-[calc(100%-36px)] border-2 border-dashed border-gray-200 rounded-[28px] p-6 bg-white flex flex-col items-center justify-center gap-4 group hover:border-black transition-all cursor-pointer relative overflow-hidden min-h-[240px]"
+                                 >
+                                    {formData.digitalFilesImage ? (
+                                       <img src={formData.digitalFilesImage} className="absolute inset-0 w-full h-full object-cover" alt="Digital File" />
+                                    ) : (
+                                       <>
+                                          <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110">
+                                             <Upload size={20} className="text-gray-400" />
+                                          </div>
+                                          <div className="text-center">
+                                             <p className="text-[14px] font-black text-gray-900">Upload Image</p>
+                                             <p className="text-[10px] font-bold text-gray-400 mt-1">Recommending 1250px x 1204 or up to 10 mb</p>
+                                          </div>
+                                       </>
+                                    )}
+                                 </div>
+                              </div>
+                           )}
+                        </div>
+                     )}
+
+                     {subStep === 2 && (
+                        <div className="space-y-8 animate-in fade-in duration-300">
+                           <div className="space-y-4">
+                              <div className="flex items-center gap-3">
+                                 <div className="w-6 h-6 rounded-full border border-gray-100 flex items-center justify-center text-[10px] font-black bg-white shadow-sm">1</div>
+                                 <label className="text-[14px] font-black text-gray-900">Product Name</label>
+                              </div>
+                              <input
+                                 className="w-full px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black transition-all shadow-sm"
+                                 placeholder="Enter Product Name"
+                                 value={formData.productTitle}
+                                 onChange={e => setFormData({ ...formData, productTitle: e.target.value })}
+                              />
+                           </div>
+                           <div className="space-y-3">
+                              <label className="text-[14px] font-black text-gray-900 ml-9">Product descriptions</label>
+                              <textarea
+                                 className="ml-9 w-[calc(100%-36px)] h-32 px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black shadow-sm resize-none font-sans"
+                                 placeholder="Descriptions"
+                                 value={formData.productDescription}
+                                 onChange={e => setFormData({ ...formData, productDescription: e.target.value })}
+                              />
+                           </div>
+                        </div>
+                     )}
+
+                     {subStep === 3 && (
+                        <div className="space-y-10 animate-in fade-in duration-300 relative">
+                           {/* Pricing Options */}
+                           <div className="space-y-6">
+                              <div className="flex items-center gap-3">
+                                 <div className="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center text-[12px] font-black bg-white shadow-sm">3</div>
+                                 <label className="text-[15px] font-black text-gray-900">Pricing & Settings</label>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-x-12 gap-y-6 ml-11">
+                                 {[
+                                    { id: "fixed", label: "Fixed price" },
+                                    { id: "quantity", label: "Price per quantity" },
+                                    { id: "customer", label: "Customers decide a price" },
+                                    { id: "free", label: "Free" }
+                                 ].map((opt) => (
+                                    <label key={opt.id} className="flex items-center gap-4 cursor-pointer group">
+                                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${formData.pricingType === opt.id ? "border-black" : "border-gray-200 group-hover:border-gray-400"}`}>
+                                          {formData.pricingType === opt.id && <div className="w-2.5 h-2.5 bg-black rounded-full" />}
+                                       </div>
+                                       <input
+                                          type="radio"
+                                          className="hidden"
+                                          name="pricing"
+                                          checked={formData.pricingType === opt.id}
+                                          onChange={() => setFormData({ ...formData, pricingType: opt.id })}
+                                       />
+                                       <span className={`text-[14px] font-bold ${formData.pricingType === opt.id ? "text-black" : "text-gray-500"}`}>{opt.label}</span>
+                                    </label>
+                                 ))}
+                              </div>
+
+                              <div className="ml-11 space-y-6 pt-4">
+                                 <div className="relative max-w-md">
+                                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
+                                    <input
+                                       className="w-full pl-10 pr-5 py-4 bg-white border border-gray-100 rounded-xl text-[14px] font-bold outline-none focus:border-black shadow-sm"
+                                       placeholder="Enter Price"
+                                       value={formData.price}
+                                       onChange={e => setFormData({ ...formData, price: e.target.value })}
+                                    />
+                                 </div>
+
+                                 <label className="flex items-center gap-3 cursor-pointer group max-w-fit">
+                                    <div className="w-5 h-5 rounded border-2 border-gray-200 flex items-center justify-center transition-all group-hover:border-black">
+                                       <input
+                                          type="checkbox"
+                                          className="hidden"
+                                          checked={formData.pppEnabled}
+                                          onChange={() => setFormData({ ...formData, pppEnabled: !formData.pppEnabled })}
+                                       />
+                                       {formData.pppEnabled && <Check size={14} className="text-black" strokeWidth={4} />}
+                                    </div>
+                                    <span className="text-[13px] font-bold text-gray-600">Offer discounted price on selling price</span>
+                                 </label>
+
+                                 {formData.pppEnabled && (
+                                    <div className="relative max-w-md animate-in slide-in-from-top-2 duration-300">
+                                       <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
+                                       <input
+                                          className="w-full pl-10 pr-5 py-4 bg-white border border-gray-100 rounded-xl text-[14px] font-bold outline-none focus:border-black shadow-sm"
+                                          placeholder="Enter Discount Price"
+                                          value={formData.discountPrice}
+                                          onChange={e => setFormData({ ...formData, discountPrice: e.target.value })}
+                                       />
+                                    </div>
+                                 )}
+                              </div>
+                           </div>
+
+                           {/* List of Added Products */}
+                           <div className="space-y-4">
+                              {formData.products?.map((prod, idx) => (
+                                 <div key={prod.id} className="ml-0 md:-mx-4 p-8 bg-white border border-gray-100 rounded-[40px] flex items-center gap-6 relative group hover:shadow-xl transition-all duration-500">
+                                    <div className="w-20 h-20 bg-gray-50 rounded-2xl overflow-hidden border border-gray-50 shadow-sm flex-shrink-0">
+                                       {prod.image ? <img src={prod.image} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100 flex items-center justify-center"><ListIcon size={30} className="text-gray-200" /></div>}
+                                    </div>
+                                    <div className="flex-1 space-y-1">
+                                       <h4 className="text-[15px] font-black text-gray-900">{prod.title}</h4>
+                                       <p className="text-[12px] font-bold text-gray-400">Digital Files | 1 media</p>
+                                       <div className="flex items-center gap-2 pt-1">
+                                          <span className="text-[14px] font-black">₹{prod.price}</span>
+                                       </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                       <button
+                                          onClick={() => {
+                                             const newProducts = [...(formData.products || [])];
+                                             newProducts.splice(idx, 1);
+                                             setFormData({ ...formData, products: newProducts });
+                                          }}
+                                          className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-red-500 hover:shadow-md transition-all"
+                                       >
+                                          <Trash2 size={16} />
+                                       </button>
+                                    </div>
+                                 </div>
+                              ))}
+
+                              {/* Current Product Card (Preview) */}
+                              <div className="ml-0 md:-mx-4 p-8 bg-gray-50/50 border border-gray-100 rounded-[40px] flex items-center gap-6 mt-12 relative group hover:bg-white hover:shadow-xl transition-all duration-500">
+                                 <div className="w-20 h-20 bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm flex-shrink-0">
+                                    {formData.digitalFilesImage ? <img src={formData.digitalFilesImage} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100 flex items-center justify-center"><ListIcon size={30} className="text-gray-200" /></div>}
+                                 </div>
+                                 <div className="flex-1 space-y-1">
+                                    <h4 className="text-[15px] font-black text-gray-900">{formData.productTitle || formData.title || "My Class Food"}</h4>
+                                    <p className="text-[12px] font-bold text-gray-400">Digital Files | 1 media</p>
+                                    <p className="text-[12px] font-bold text-gray-400">Unlimited stock</p>
+                                    <div className="flex items-center gap-2 pt-1">
+                                       <span className="text-[14px] font-black">₹{formData.price || "99"}</span>
+                                       {formData.discountPrice && <span className="text-[12px] font-bold text-gray-300 line-through">₹{formData.price}</span>}
+                                       <span className="text-[11px] font-black text-green-500 bg-green-50 px-2 py-0.5 rounded-md">(50% off)</span>
+                                    </div>
+                                 </div>
+                                 <div className="flex items-center gap-2">
+                                    <button className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-black hover:shadow-md transition-all"><Edit3 size={16} /></button>
+                                    <button className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-red-500 hover:shadow-md transition-all"><Trash2 size={16} /></button>
+                                 </div>
+                                 <div className="absolute -left-3 top-1/2 -translate-y-1/2 flex flex-col gap-1">
+                                    <ChevronDown size={14} className="text-gray-300 -rotate-180" />
+                                    <ChevronDown size={14} className="text-gray-300" />
+                                 </div>
+
+                                 <div className="absolute left-10 -bottom-12 flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-50 z-10">
+                                    <div className="w-4 h-4 border-2 border-gray-200 rounded flex items-center justify-center">
+                                       <input type="checkbox" className="hidden" checked={formData.compulsoryBuy} onChange={() => setFormData({ ...formData, compulsoryBuy: !formData.compulsoryBuy })} />
+                                       {formData.compulsoryBuy && <Check size={10} strokeWidth={4} />}
+                                    </div>
+                                    <span className="text-[11px] font-bold text-gray-500">Make this compulsory to buy</span>
+                                 </div>
+                              </div>
+                           </div>
+
+                           {/* Add Another Product Button */}
+                           <div className="flex justify-center pt-20 pb-10">
+                              <button
+                                 onClick={() => {
+                                    if (!formData.price) return;
+                                    const newProduct = {
+                                       id: Math.random().toString(36).substr(2, 9),
+                                       title: formData.productTitle || formData.title || "Untitled Product",
+                                       price: formData.price,
+                                       description: formData.productDescription || "",
+                                       image: formData.digitalFilesImage
+                                    };
+                                    setFormData({
+                                       ...formData,
+                                       products: [...(formData.products || []), newProduct],
+                                       // Only reset product-specific fields, keep page title!
+                                       productTitle: "",
+                                       price: "",
+                                       productDescription: "",
+                                       digitalFilesImage: "",
+                                       discountPrice: "",
+                                       pppEnabled: false
+                                    });
+                                    setSubStep(1);
+                                 }}
+                                 className="flex items-center gap-3 px-8 py-4 bg-white border-2 border-dashed border-gray-200 rounded-3xl text-[14px] font-black text-gray-400 hover:border-black hover:text-black transition-all group"
+                              >
+                                 <Plus size={18} className="group-hover:scale-110 transition-transform" />
+                                 Add another product
+                              </button>
+                           </div>
+                        </div>
+                     )}
+                  </div>
+               </div>
+            ) : step === 3 ? (
+               <div className="w-full space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+                  {/* Color Section */}
+                  <div className="space-y-4">
+                     <label className="text-[14px] font-black text-gray-900">Colour</label>
+                     <div className="w-full flex items-center px-5 py-4 bg-white border border-gray-100 rounded-xl shadow-sm group focus-within:border-black transition-all">
+                        <input
+                           className="flex-1 bg-transparent outline-none text-[14px] font-bold text-gray-900 placeholder:text-gray-300"
+                           placeholder="Select Colour"
+                           value={formData.brandColor}
+                           onChange={e => setFormData({ ...formData, brandColor: e.target.value })}
+                        />
+                        <div className="flex items-center gap-2">
+                           <input
+                              type="color"
+                              className="w-12 h-6 border-none cursor-pointer bg-transparent"
+                              value={formData.brandColor}
+                              onChange={e => setFormData({ ...formData, brandColor: e.target.value })}
+                           />
+                           <div
+                              className="w-12 h-6 rounded-md shadow-inner border border-gray-100"
+                              style={{ backgroundColor: formData.brandColor || "#000000" }}
+                           />
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Toggles Section */}
+                  <div className="space-y-8 pt-4">
+                     {[
+                        { id: 'pageExpiry', title: 'Page Expiry', sub: 'Turning on this option will make the page and its content expire after a defined period of time.' },
+                        { id: 'termsAndConditions', title: 'Terms and Conditions', sub: 'You can add your own terms & conditions in addition to the default terms applied by SuperProfile' },
+                        { id: 'darkTheme', title: 'Dark theme', sub: '' },
+                        { id: 'deactivateSales', title: 'Deactivate sales', sub: '' },
+                        { id: 'trackingToggle', title: 'Tracking', sub: '' }
+                     ].map((item) => (
+                        <div key={item.id} className="flex items-center justify-between group">
+                           <div className="space-y-1 pr-10">
+                              <h3 className="text-[17px] font-black text-gray-900 group-hover:translate-x-1 transition-transform">{item.title}</h3>
+                              {item.sub && <p className="text-[13px] font-bold text-gray-400 leading-relaxed max-w-md">{item.sub}</p>}
+                           </div>
+                           <div
+                              onClick={() => setFormData({ ...formData, [item.id]: !(formData as any)[item.id] })}
+                              className={`w-14 h-8 rounded-full transition-all relative cursor-pointer flex-shrink-0 ${(formData as any)[item.id] ? 'bg-[#2ECC71]' : 'bg-gray-100'}`}
+                           >
+                              <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all ${(formData as any)[item.id] ? 'left-7' : 'left-1'}`} />
+                           </div>
+                        </div>
+                     ))}
+                  </div>
+               </div>
+            ) : null}
+         </main>
+
+         {/* Bottom Actions */}
+         <footer className="fixed bottom-0 left-0 right-0 h-32 bg-white/80 backdrop-blur-md border-t border-gray-50 flex items-center justify-end px-20 z-40 gap-4">
+            <button
+               onClick={onBack}
+               className="bg-white border border-gray-100 text-black px-12 py-5 rounded-full text-[16px] font-black shadow-sm hover:bg-gray-50 active:scale-95 transition-all"
+            >
+               Back
+            </button>
+            <button
+               onClick={step === 3 ? handlePublish : onNext}
+               className="bg-black text-white px-16 py-5 rounded-full text-[16px] font-black shadow-2xl hover:scale-[1.02] active:scale-95 transition-all w-full max-w-[240px] flex items-center justify-center uppercase tracking-widest"
+            >
+               {step === 3 ? "Publish page" : "Next"}
+            </button>
+         </footer>
+      </div>
+   );
+}
