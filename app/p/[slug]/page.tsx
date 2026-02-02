@@ -653,10 +653,10 @@ export default function PublicProductPage() {
 
             {/* Premium Checkout Modal */}
             {showCheckout && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 overflow-hidden animate-in fade-in duration-300">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => checkoutStep !== "verifying" && setShowCheckout(false)} />
+                <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 py-8 overflow-y-auto animate-in fade-in duration-300">
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-xl" onClick={() => checkoutStep !== "verifying" && setShowCheckout(false)} />
 
-                    <div className="relative w-full max-w-2xl bg-white rounded-[64px] shadow-[0_48px_128px_-32px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-20 duration-700 font-sans border border-white/10 p-1 bg-gradient-to-b from-white to-slate-50">
+                    <div className="relative w-full max-w-2xl bg-white rounded-[40px] md:rounded-[64px] shadow-[0_48px_128px_-32px_rgba(0,0,0,0.5)] my-auto animate-in zoom-in-95 slide-in-from-bottom-20 duration-700 font-sans border border-white/20 p-1 bg-gradient-to-b from-white to-slate-50 overflow-visible">
                         {checkoutStep !== "success" && (
                             <button
                                 onClick={() => setShowCheckout(false)}
@@ -719,46 +719,45 @@ export default function PublicProductPage() {
                                                     value={email}
                                                     onChange={e => setEmail(e.target.value)}
                                                     disabled={emailVerified}
-                                                    className={`w-full pl-16 pr-32 py-6 bg-slate-50 border-2 transition-all duration-500 rounded-[24px] text-lg font-bold outline-none shadow-sm ${emailVerified ? 'border-emerald-500 bg-emerald-50/10 text-emerald-950' : 'border-slate-100 focus:border-slate-900 focus:bg-white focus:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)]'}`}
+                                                    className={`w-full pl-16 pr-32 py-6 bg-slate-50 border-2 border-slate-100 transition-all duration-500 rounded-[28px] text-lg font-bold text-slate-900 outline-none shadow-sm ${emailVerified ? 'border-emerald-500 bg-emerald-50/10 text-emerald-950' : 'focus:border-slate-900 focus:bg-white focus:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)]'}`}
                                                     placeholder="alex@example.com"
                                                 />
                                                 {formData.emailVerification && !emailVerified && email && !showEmailOtp && (
                                                     <button
                                                         onClick={verifyEmail}
                                                         disabled={verifyingEmail}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white px-8 py-4 rounded-[18px] text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all disabled:opacity-50 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white px-8 py-4 rounded-[18px] text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all disabled:opacity-50 shadow-lg"
                                                     >
-                                                        {verifyingEmail ? <RefreshCw className="animate-spin" size={14} /> : "Verify Now"}
+                                                        {verifyingEmail ? <RefreshCw className="animate-spin" size={14} /> : "Verify"}
                                                     </button>
                                                 )}
                                             </div>
 
                                             {showEmailOtp && (
                                                 <div className="pt-2 animate-in slide-in-from-top-6 duration-700">
-                                                    <div className="bg-slate-900 p-10 rounded-[40px] shadow-2xl space-y-8 relative overflow-hidden border border-white/5">
-                                                        <div className="absolute top-0 right-0 w-48 h-48 bg-white/[0.03] blur-3xl rounded-full" />
-                                                        <div className="space-y-2 relative z-10 text-center">
-                                                            <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em]">Confirmation Code</p>
-                                                            <p className="text-white/60 text-sm font-medium">Please check your inbox for the 4-digit key</p>
+                                                    <div className="bg-slate-50 p-6 md:p-8 rounded-[40px] shadow-inner border border-slate-100 space-y-6 relative overflow-visible">
+                                                        <div className="space-y-1 text-center">
+                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Confirmation Code</p>
+                                                            <p className="text-slate-500 text-xs font-medium">Check your inbox for the 4-digit key</p>
                                                         </div>
-                                                        <div className="flex flex-col md:flex-row gap-4 relative z-10">
+                                                        <div className="flex flex-col gap-3 relative z-10 max-w-xs mx-auto">
                                                             <input
                                                                 type="text"
                                                                 maxLength={4}
                                                                 value={emailOtp}
                                                                 onChange={e => setEmailOtp(e.target.value)}
-                                                                className="flex-1 px-8 py-6 bg-white/5 border border-white/10 rounded-[24px] text-center text-4xl font-black tracking-[0.8em] outline-none focus:border-white/30 text-white transition-all shadow-inner placeholder:text-white/5"
-                                                                placeholder="••••"
+                                                                className="w-full px-6 py-5 bg-white border-2 border-slate-200 rounded-[24px] text-center text-3xl font-black text-slate-950 outline-none focus:border-slate-900 transition-all shadow-sm"
+                                                                placeholder="0000"
                                                             />
                                                             <button
                                                                 onClick={confirmEmailOtp}
-                                                                className="bg-white text-slate-950 px-12 py-6 rounded-[24px] font-black text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-black/20"
+                                                                className="w-full bg-slate-950 text-white py-5 rounded-[24px] font-black text-sm hover:bg-black transition-all shadow-lg active:scale-[0.98]"
                                                             >
-                                                                Authenticate
+                                                                Verify & Unlock
                                                             </button>
                                                         </div>
-                                                        <div className="text-center relative z-10">
-                                                            <button onClick={() => setShowEmailOtp(false)} className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] hover:text-white transition-colors">Entered wrong email?</button>
+                                                        <div className="text-center">
+                                                            <button onClick={() => setShowEmailOtp(false)} className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-slate-900 transition-colors">Entered wrong email?</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -781,14 +780,14 @@ export default function PublicProductPage() {
                                                         value={phone}
                                                         onChange={e => setPhone(e.target.value)}
                                                         disabled={phoneVerified}
-                                                        className={`w-full pl-16 pr-32 py-6 bg-slate-50 border-2 transition-all duration-500 rounded-[24px] text-lg font-bold outline-none shadow-sm ${phoneVerified ? 'border-emerald-500 bg-emerald-50/10 text-emerald-950' : 'border-slate-100 focus:border-slate-900 focus:bg-white focus:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)]'}`}
+                                                        className="w-full pl-16 pr-32 py-6 bg-slate-50 border-2 border-slate-100 transition-all duration-500 rounded-[24px] text-lg font-bold text-slate-950 outline-none shadow-sm disabled:bg-emerald-50/10 focus:border-slate-900 focus:bg-white focus:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)]"
                                                         placeholder="+91 00000 00000"
                                                     />
                                                     {!phoneVerified && phone && !showPhoneOtp && (
                                                         <button
                                                             onClick={verifyPhone}
                                                             disabled={verifyingPhone}
-                                                            className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white px-8 py-4 rounded-[18px] text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all disabled:opacity-50 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                                                            className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white px-8 py-4 rounded-[18px] text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all disabled:opacity-50 shadow-lg"
                                                         >
                                                             {verifyingPhone ? <RefreshCw className="animate-spin" size={14} /> : "Get OTP"}
                                                         </button>
@@ -797,30 +796,29 @@ export default function PublicProductPage() {
 
                                                 {showPhoneOtp && (
                                                     <div className="pt-2 animate-in slide-in-from-top-4 duration-500">
-                                                        <div className="bg-slate-900 p-10 rounded-[40px] shadow-2xl space-y-8 relative overflow-hidden border border-white/5">
-                                                            <div className="absolute top-0 right-0 w-48 h-48 bg-white/[0.03] blur-3xl rounded-full" />
-                                                            <div className="space-y-2 relative z-10 text-center">
-                                                                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em]">One-Time Password</p>
-                                                                <p className="text-white/60 text-sm font-medium">Sent to active mobile device</p>
+                                                        <div className="bg-slate-50 p-6 md:p-8 rounded-[40px] shadow-inner border border-slate-100 space-y-6 relative overflow-visible">
+                                                            <div className="space-y-1 text-center">
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">One-Time Password</p>
+                                                                <p className="text-slate-500 text-xs font-medium">Sent to your mobile device</p>
                                                             </div>
-                                                            <div className="flex flex-col md:flex-row gap-4 relative z-10">
+                                                            <div className="flex flex-col gap-3 relative z-10 max-w-xs mx-auto">
                                                                 <input
                                                                     type="text"
                                                                     maxLength={4}
                                                                     value={phoneOtp}
                                                                     onChange={e => setPhoneOtp(e.target.value)}
-                                                                    className="flex-1 px-8 py-6 bg-white/5 border border-white/10 rounded-[24px] text-center text-4xl font-black tracking-[0.8em] outline-none focus:border-white/30 text-white transition-all shadow-inner"
-                                                                    placeholder="••••"
+                                                                    className="w-full px-6 py-5 bg-white border-2 border-slate-200 rounded-[24px] text-center text-3xl font-black text-slate-950 outline-none focus:border-slate-900 transition-all shadow-sm"
+                                                                    placeholder="0000"
                                                                 />
                                                                 <button
                                                                     onClick={confirmPhoneOtp}
-                                                                    className="bg-white text-slate-950 px-12 py-6 rounded-[24px] font-black text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-black/20"
+                                                                    className="w-full bg-slate-950 text-white py-5 rounded-[24px] font-black text-sm hover:bg-black transition-all shadow-lg active:scale-[0.98]"
                                                                 >
                                                                     Verify OTP
                                                                 </button>
                                                             </div>
-                                                            <div className="text-center relative z-10">
-                                                                <button onClick={() => setShowPhoneOtp(false)} className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] hover:text-white transition-colors">Different info?</button>
+                                                            <div className="text-center">
+                                                                <button onClick={() => setShowPhoneOtp(false)} className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-slate-900 transition-colors">Different info?</button>
                                                             </div>
                                                         </div>
                                                     </div>
