@@ -50,16 +50,42 @@ export function BuilderProvider({ children }: { children: React.ReactNode }) {
     const [isLive, setIsLive] = useState(false);
     const [formData, setFormData] = useState<FormData>(initialFormData);
 
-    // Auto-save & Restore Draft
+    // Load Data from URL or Draft
     React.useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const editSlug = urlParams.get('edit');
+
+        // Detect flow type from URL path
+        const pathParts = window.location.pathname.split('/');
+        const urlType = pathParts[pathParts.indexOf('builder') + 1] as FlowType;
+
+        if (editSlug) {
+            const savedWebsite = localStorage.getItem(`website_${editSlug}`);
+            if (savedWebsite) {
+                try {
+                    const parsed = JSON.parse(savedWebsite);
+                    setFormData(parsed);
+                    setStep(1);
+                    setSubStep(1);
+                    if (urlType) setFlowType(urlType);
+                    return;
+                } catch (e) {
+                    console.error("Failed to parse website data", e);
+                }
+            }
+        }
+
         const savedDraft = localStorage.getItem('builder_draft');
         if (savedDraft) {
             try {
                 const parsed = JSON.parse(savedDraft);
-                setFormData(parsed.formData || initialFormData);
-                setStep(parsed.step || 1);
-                setSubStep(parsed.subStep || 1);
-                setFlowType(parsed.flowType || "digital");
+                // Only load draft if it matches the current flow type or if we're not in a specific type
+                if (!urlType || parsed.flowType === urlType) {
+                    setFormData(parsed.formData || initialFormData);
+                    setStep(parsed.step || 1);
+                    setSubStep(parsed.subStep || 1);
+                    setFlowType(parsed.flowType || "digital");
+                }
             } catch (e) {
                 console.error("Failed to parse draft", e);
             }
