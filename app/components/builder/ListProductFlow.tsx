@@ -1,6 +1,12 @@
 "use client";
 
-import { X, ChevronDown, Check, Upload, Bold, Italic, Underline, AlignLeft, List as ListIcon, Trash2, Edit3, Globe, Copy, Info, RefreshCw, Plus, Mail, Phone } from "lucide-react";
+import {
+   X, ChevronDown, Check, Upload, Bold, Italic, Underline, AlignLeft,
+   List as ListIcon, Trash2, Edit3, Globe, Copy, Info, RefreshCw, Plus,
+   Search, Store, FileText, Image as ImageIcon, HelpCircle, Users,
+   Layout, Mail, Phone, ArrowRight, Save, Clock, Trash, ChevronLeft,
+   Instagram, Twitter, ExternalLink
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { FormData, Product } from "@/lib/types";
 import { uploadToS3 } from "@/lib/upload";
@@ -29,6 +35,8 @@ export default function ListProductFlow({
    const [isUploading, setIsUploading] = useState(false);
    const [currentHost, setCurrentHost] = useState("");
    const [tempImageUrl, setTempImageUrl] = useState("");
+   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+   const [tempTestimonialLink, setTempTestimonialLink] = useState("");
    const descRef = useState<HTMLTextAreaElement | null>(null)[0]; // Placeholder for ref logic
 
    useEffect(() => {
@@ -169,17 +177,30 @@ export default function ListProductFlow({
       );
    }
 
-   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string, isArray: boolean = false) => {
       const file = e.target.files?.[0];
       if (file) {
          // Optimistic Update: Show local image immediately
          const localUrl = URL.createObjectURL(file);
-         setFormData({ ...formData, [field]: localUrl });
+         if (isArray) {
+            const currentArr = (formData as any)[field] || [];
+            setFormData({ ...formData, [field]: [...currentArr, localUrl] });
+         } else {
+            setFormData({ ...formData, [field]: localUrl });
+         }
 
          setIsUploading(true);
          try {
             const s3Url = await uploadToS3(file, field);
-            setFormData((prev: FormData) => ({ ...prev, [field]: s3Url }));
+            // Replace local URL with S3 URL
+            setFormData((prev: FormData) => {
+               if (isArray) {
+                  const currentArr = (prev as any)[field] || [];
+                  return { ...prev, [field]: currentArr.map((url: string) => url === localUrl ? s3Url : url) };
+               } else {
+                  return { ...prev, [field]: s3Url };
+               }
+            });
          } catch (err) {
             console.error("Upload error:", err);
             alert("Failed to upload image.");
@@ -372,6 +393,175 @@ export default function ListProductFlow({
                            value={formData.description}
                            onChange={e => setFormData({ ...formData, description: e.target.value })}
                         />
+                     </div>
+                  </div>
+
+                  {/* Optional Sections */}
+                  <div className="space-y-6 pt-6 animate-in slide-in-from-bottom-4 duration-500 w-full">
+                     <h3 className="text-[14px] font-black text-gray-900 uppercase tracking-widest">Optional Sections</h3>
+                     <div className="grid gap-4">
+                        {[
+                           { id: "gallery", label: "Gallery Showcase" },
+                           { id: "testimonial", label: "Customer Testimonials" },
+                           { id: "faq", label: "F.A.Q Section" },
+                           { id: "aboutUs", label: "Our Story / About" },
+                           { id: "footer", label: "Footer & Socials" }
+                        ].map((item) => (
+                           <div key={item.id} className="space-y-4">
+                              <div
+                                 onClick={() => setExpandedSection(expandedSection === item.id ? null : item.id)}
+                                 className={`flex items-center justify-between p-6 bg-white border rounded-[28px] cursor-pointer transition-all hover:shadow-md ${expandedSection === item.id ? 'border-black shadow-lg' : 'border-gray-100 hover:border-gray-200'}`}
+                              >
+                                 <div className="flex items-center gap-4">
+                                    <span className={`text-[15px] font-black ${expandedSection === item.id ? 'text-black' : 'text-gray-900'}`}>{item.label}</span>
+                                 </div>
+                                 <ChevronDown size={18} className={`text-gray-400 transition-transform duration-500 ${expandedSection === item.id ? 'rotate-180 text-black' : ''}`} />
+                              </div>
+
+                              {expandedSection === item.id && (
+                                 <div className="p-8 bg-[#FCFCFD] border border-gray-100 rounded-[32px] space-y-8 animate-in slide-in-from-top-4 duration-500 shadow-inner">
+                                    {item.id === "gallery" && (
+                                       <div className="space-y-6">
+                                          <input
+                                             className="w-full px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black shadow-sm"
+                                             placeholder="Gallery Title (e.g. Visual Showcase)"
+                                             value={formData.galleryTitle || ""}
+                                             onChange={e => setFormData({ ...formData, galleryTitle: e.target.value })}
+                                          />
+                                          <div className="grid grid-cols-4 gap-4">
+                                             {formData.galleryImages?.map((img: string, i: number) => (
+                                                <div key={i} className="aspect-square rounded-2xl overflow-hidden border border-gray-200 relative group shadow-sm">
+                                                   <img src={img} className="w-full h-full object-cover" />
+                                                   <button
+                                                      onClick={() => setFormData({ ...formData, galleryImages: formData.galleryImages?.filter((_: any, idx: number) => idx !== i) })}
+                                                      className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                   >
+                                                      <X size={12} />
+                                                   </button>
+                                                </div>
+                                             ))}
+                                             <label className="aspect-square border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center bg-white hover:border-black transition-all cursor-pointer group">
+                                                <Upload size={20} className="text-gray-300 group-hover:text-black transition-colors" />
+                                                <input type="file" className="hidden" accept="image/*" onChange={e => handleImageUpload(e, 'galleryImages', true)} />
+                                             </label>
+                                          </div>
+                                       </div>
+                                    )}
+
+                                    {item.id === "testimonial" && (
+                                       <div className="space-y-6">
+                                          <div className="flex items-center gap-6">
+                                             <div className="w-16 h-16 rounded-full bg-white border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                                                {formData.testimonialImage ? <img src={formData.testimonialImage} className="w-full h-full object-cover" /> : <Users size={28} className="text-gray-100" />}
+                                             </div>
+                                             <label className="flex-1 cursor-pointer py-4 border-2 border-dashed border-gray-200 rounded-2xl text-center text-[13px] font-black hover:border-black transition-all bg-white">
+                                                Upload Customer Photo
+                                                <input type="file" className="hidden" accept="image/*" onChange={e => handleImageUpload(e, 'testimonialImage')} />
+                                             </label>
+                                          </div>
+                                          <input
+                                             className="w-full px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black shadow-sm"
+                                             placeholder="Customer Name"
+                                             value={formData.testimonialName || ""}
+                                             onChange={e => setFormData({ ...formData, testimonialName: e.target.value })}
+                                          />
+                                          <textarea
+                                             className="w-full h-32 px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black shadow-sm resize-none font-sans"
+                                             placeholder="Their testimonial message..."
+                                             value={formData.testimonialComment || ""}
+                                             onChange={e => setFormData({ ...formData, testimonialComment: e.target.value })}
+                                          />
+                                       </div>
+                                    )}
+
+                                    {item.id === "faq" && (
+                                       <div className="space-y-6">
+                                          {formData.faqs?.map((faq: any, idx: number) => (
+                                             <div key={idx} className="p-6 bg-white border border-gray-100 rounded-[24px] space-y-4 relative group shadow-sm">
+                                                <button
+                                                   onClick={() => {
+                                                      const newFaqs = [...(formData.faqs || [])];
+                                                      newFaqs.splice(idx, 1);
+                                                      setFormData({ ...formData, faqs: newFaqs });
+                                                   }}
+                                                   className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                                >
+                                                   <X size={12} />
+                                                </button>
+                                                <input
+                                                   className="w-full px-4 py-3 bg-gray-50 border border-gray-50 rounded-xl text-[13px] font-bold outline-none focus:border-black transition-all"
+                                                   placeholder="Question"
+                                                   value={faq.question}
+                                                   onChange={e => {
+                                                      const newFaqs = [...(formData.faqs || [])];
+                                                      newFaqs[idx].question = e.target.value;
+                                                      setFormData({ ...formData, faqs: newFaqs });
+                                                   }}
+                                                />
+                                                <textarea
+                                                   className="w-full h-24 px-4 py-3 bg-gray-50 border border-gray-50 rounded-xl text-[13px] font-bold outline-none focus:border-black transition-all resize-none font-sans"
+                                                   placeholder="Answer"
+                                                   value={faq.answer}
+                                                   onChange={e => {
+                                                      const newFaqs = [...(formData.faqs || [])];
+                                                      newFaqs[idx].answer = e.target.value;
+                                                      setFormData({ ...formData, faqs: newFaqs });
+                                                   }}
+                                                />
+                                             </div>
+                                          ))}
+                                          <button
+                                             onClick={() => setFormData({ ...formData, faqs: [...(formData.faqs || []), { question: "", answer: "" }] })}
+                                             className="w-full py-4 border-2 border-dashed border-gray-200 rounded-[24px] text-[13px] font-black text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2 bg-white"
+                                          >
+                                             <Plus size={16} /> Add FAQ
+                                          </button>
+                                       </div>
+                                    )}
+
+                                    {item.id === "aboutUs" && (
+                                       <textarea
+                                          className="w-full h-48 px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black shadow-sm resize-none font-sans"
+                                          placeholder="Share your story, mission, and background..."
+                                          value={formData.aboutUs || ""}
+                                          onChange={e => setFormData({ ...formData, aboutUs: e.target.value })}
+                                       />
+                                    )}
+
+                                    {item.id === "footer" && (
+                                       <div className="space-y-6">
+                                          <input
+                                             className="w-full px-5 py-4 bg-white border border-gray-200 rounded-xl text-[14px] font-bold outline-none focus:border-black shadow-sm"
+                                             placeholder="Footer Copyright Text"
+                                             value={formData.footerText || ""}
+                                             onChange={e => setFormData({ ...formData, footerText: e.target.value })}
+                                          />
+                                          <div className="grid grid-cols-2 gap-4">
+                                             <div className="relative">
+                                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                                <input
+                                                   className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-xl text-[13px] font-bold outline-none focus:border-black shadow-sm"
+                                                   placeholder="Instagram handle"
+                                                   value={formData.socialInstagram || ""}
+                                                   onChange={e => setFormData({ ...formData, socialInstagram: e.target.value })}
+                                                />
+                                             </div>
+                                             <div className="relative">
+                                                <Twitter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                                <input
+                                                   className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-xl text-[13px] font-bold outline-none focus:border-black shadow-sm"
+                                                   placeholder="Twitter handle"
+                                                   value={formData.socialTwitter || ""}
+                                                   onChange={e => setFormData({ ...formData, socialTwitter: e.target.value })}
+                                                />
+                                             </div>
+                                          </div>
+                                       </div>
+                                    )}
+                                 </div>
+                              )}
+                           </div>
+                        ))}
                      </div>
                   </div>
                </div>
@@ -733,6 +923,65 @@ export default function ListProductFlow({
                   )}
 
                   <div className="space-y-8 pt-10 border-t border-gray-100">
+                     <h3 className="text-[14px] font-black text-gray-400 uppercase tracking-widest">Post-Purchase</h3>
+                     <div className="space-y-4">
+                        <div className="p-6 bg-white border border-gray-100 rounded-[28px] shadow-sm hover:border-black/20 transition-all space-y-4">
+                           <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                 <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center">
+                                    <ExternalLink size={22} />
+                                 </div>
+                                 <div className="space-y-0.5">
+                                    <p className="text-[16px] font-black text-gray-900">Custom Redirect</p>
+                                    <p className="text-[12px] font-bold text-gray-400">Redirect buyers after successful payment</p>
+                                 </div>
+                              </div>
+                              <div
+                                 onClick={() => setFormData({ ...formData, customRedirectToggle: !formData.customRedirectToggle })}
+                                 className={`w-14 h-8 rounded-full transition-all relative cursor-pointer ${formData.customRedirectToggle ? 'bg-black' : 'bg-gray-100'}`}
+                              >
+                                 <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all ${formData.customRedirectToggle ? 'left-7' : 'left-1'}`} />
+                              </div>
+                           </div>
+                           {formData.customRedirectToggle && (
+                              <input
+                                 className="w-full px-5 py-4 bg-gray-50/50 border border-gray-100 rounded-[16px] text-[13px] font-bold outline-none focus:border-black transition-all"
+                                 placeholder="https://your-website.com/thank-you"
+                                 value={formData.customRedirectUrl || ""}
+                                 onChange={e => setFormData({ ...formData, customRedirectUrl: e.target.value })}
+                              />
+                           )}
+                        </div>
+
+                        <div className="p-6 bg-white border border-gray-100 rounded-[28px] shadow-sm hover:border-black/20 transition-all space-y-4">
+                           <div className="flex items-center gap-4 mb-2">
+                              <div className="w-12 h-12 bg-pink-50 text-pink-600 rounded-2xl flex items-center justify-center">
+                                 <Check size={22} />
+                              </div>
+                              <div className="space-y-0.5">
+                                 <p className="text-[16px] font-black text-gray-900">Success Message</p>
+                                 <p className="text-[12px] font-bold text-gray-400">Customize what buyers see after payment</p>
+                              </div>
+                           </div>
+                           <div className="space-y-3">
+                              <input
+                                 className="w-full px-5 py-4 bg-gray-50/50 border border-gray-100 rounded-[16px] text-[13px] font-bold outline-none focus:border-black transition-all"
+                                 placeholder="Success Title (e.g. Welcome to the Tribe!)"
+                                 value={formData.successMessageTitle || ""}
+                                 onChange={e => setFormData({ ...formData, successMessageTitle: e.target.value })}
+                              />
+                              <textarea
+                                 className="w-full h-24 px-5 py-4 bg-gray-50/50 border border-gray-100 rounded-[16px] text-[13px] font-bold outline-none focus:border-black transition-all resize-none"
+                                 placeholder="Success Message (e.g. Your credentials have been sent...)"
+                                 value={formData.successMessage || ""}
+                                 onChange={e => setFormData({ ...formData, successMessage: e.target.value })}
+                              />
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="space-y-8 pt-10 border-t border-gray-100">
                      <h3 className="text-[14px] font-black text-gray-400 uppercase tracking-widest">Customer Information</h3>
                      <div className="space-y-4">
                         <div className="flex items-center justify-between p-6 bg-white border border-gray-100 rounded-[28px] shadow-sm hover:border-black/20 transition-all">
@@ -785,10 +1034,26 @@ export default function ListProductFlow({
                Back
             </button>
             <button
-               onClick={step === 3 ? handlePublish : onNext}
-               className="bg-black text-white px-16 py-5 rounded-full text-[16px] font-black shadow-2xl hover:scale-[1.02] active:scale-95 transition-all w-full max-w-[240px] flex items-center justify-center uppercase tracking-widest"
+               disabled={isUploading}
+               onClick={() => {
+                  if (step === 1) onNext();
+                  else if (step === 2) {
+                     // In list flow, step 2 has substeps
+                     if (subStep < 3) setSubStep(subStep + 1);
+                     else onNext();
+                  } else if (step === 3) {
+                     handlePublish();
+                  }
+               }}
+               className={`px-12 py-5 rounded-full text-[16px] font-black shadow-xl transition-all active:scale-95 flex items-center gap-2 ${isUploading ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-900'}`}
             >
-               {step === 3 ? "Publish page" : "Next"}
+               {isUploading ? (
+                  <>
+                     <RefreshCw size={18} className="animate-spin" /> Uploading...
+                  </>
+               ) : (
+                  step === 3 ? "Publish Collection" : "Continue"
+               )}
             </button>
          </footer>
       </div>

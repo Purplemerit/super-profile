@@ -1,15 +1,18 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useBuilder } from "../components/BuilderContext";
 import DigitalProductFlow from "@/app/components/builder/DigitalProductFlow";
 import ListProductFlow from "@/app/components/builder/ListProductFlow";
 import { FlowType } from "@/lib/types";
+import { useEffect } from "react";
 
 export default function BuilderFlowPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const type = params.type as FlowType;
+    const editSlug = searchParams.get('edit');
 
     const {
         formData, setFormData,
@@ -18,6 +21,39 @@ export default function BuilderFlowPage() {
         isLive, setIsLive,
         resetBuilder
     } = useBuilder();
+
+    useEffect(() => {
+        if (editSlug) {
+            const savedData = localStorage.getItem(`website_${editSlug}`);
+            if (savedData) {
+                try {
+                    const parsed = JSON.parse(savedData);
+                    setFormData(parsed);
+                } catch (e) {
+                    console.error("Failed to parse edit data", e);
+                }
+            } else {
+                // Check if it's demo data by index
+                const listRaw = localStorage.getItem('websites_list');
+                const list = listRaw ? JSON.parse(listRaw) : [];
+                const index = parseInt(editSlug);
+                if (!isNaN(index) && list[index]) {
+                    // It's a demo item without slug, convert it to formData partially
+                    const demoItem = list[index];
+                    setFormData({
+                        ...formData,
+                        title: demoItem.title,
+                        price: demoItem.price.replace(/[^\d]/g, ''),
+                        coverImage: demoItem.image
+                    });
+                }
+            }
+        } else {
+            // New creation, but don't reset if we are already in the middle of it?
+            // Actually, if you navigate to /builder/type without edit slug, it should start fresh
+            // but the Context already handles the initial state.
+        }
+    }, [editSlug]);
 
     const onNext = () => {
         if (type === "digital") {
