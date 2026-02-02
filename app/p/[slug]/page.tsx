@@ -4,7 +4,9 @@ import { useParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { FormData, Product } from "@/lib/types";
 import {
-    ImageIcon, Users, Instagram, Twitter, Store, Check, Mail, Phone, ShieldCheck, ArrowRight, X, Loader2, Sparkles, Globe, Lock
+    Check, X, Plus, HelpCircle, Mail, Phone, Users, Instagram, Twitter, Globe,
+    ArrowRight, Star, ShoppingBag, ShieldCheck, Lock, ChevronDown, RefreshCw,
+    Loader2, Sparkles, Store, Image as ImageIcon
 } from "lucide-react";
 
 export default function PublicProductPage() {
@@ -535,6 +537,71 @@ export default function PublicProductPage() {
                     </section>
                 )}
 
+                {/* About Us Section */}
+                {formData.aboutUs && (
+                    <section className="w-full space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                        <div className="flex items-center gap-4 w-full">
+                            <div className="h-[1px] flex-1 bg-current opacity-10" />
+                            <h2 className="text-[12px] font-black uppercase tracking-[0.4em] opacity-30 px-4">The Story</h2>
+                            <div className="h-[1px] flex-1 bg-current opacity-10" />
+                        </div>
+                        <div className={`p-12 md:p-20 rounded-[64px] border ${style.border} ${style.card} text-center space-y-8`}>
+                            <h3 className="text-4xl md:text-5xl font-black tracking-tight">Behind the Brand</h3>
+                            <p className={`text-xl md:text-2xl leading-relaxed opacity-70 ${style.sub} max-w-3xl mx-auto whitespace-pre-wrap`}>
+                                {formData.aboutUs}
+                            </p>
+                        </div>
+                    </section>
+                )}
+
+                {/* Gallery Section */}
+                {formData.galleryImages && formData.galleryImages.length > 0 && (
+                    <section className="w-full space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                        <div className="text-center space-y-4">
+                            <h3 className="text-4xl md:text-5xl font-black tracking-tight">{formData.galleryTitle || "Visual Showcase"}</h3>
+                            <div className={`h-1.5 w-24 mx-auto rounded-full`} style={{ backgroundColor: brandColor }} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {formData.galleryImages.map((img, i) => (
+                                <div key={i} className={`group aspect-square rounded-[40px] overflow-hidden border ${style.border} shadow-2xl relative`}>
+                                    <img src={img} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={`Gallery ${i}`} />
+                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Testimonial Section */}
+                {formData.testimonialName && (
+                    <section className="w-full animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                        <div className={`relative p-12 md:p-24 rounded-[80px] border ${style.border} ${style.card} overflow-hidden group`}>
+                            <div className={`absolute -top-24 -right-24 w-96 h-96 bg-gradient-to-br ${style.gradient} opacity-20 blur-[100px] pointer-events-none group-hover:opacity-40 transition-opacity duration-1000`} />
+
+                            <div className="relative z-10 flex flex-col items-center text-center space-y-10">
+                                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl">
+                                    {formData.testimonialImage ? (
+                                        <img src={formData.testimonialImage} className="w-full h-full object-cover" alt={formData.testimonialName} />
+                                    ) : (
+                                        <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">
+                                            <Users size={40} />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="space-y-6 max-w-3xl">
+                                    <p className="text-2xl md:text-4xl font-black italic leading-[1.2] tracking-tight">
+                                        "{formData.testimonialComment || "Absolutely life-changing experience. Highly recommended for anyone looking to scale their digital presence!"}"
+                                    </p>
+                                    <div className="space-y-1">
+                                        <h4 className="text-xl font-black uppercase tracking-widest">{formData.testimonialName}</h4>
+                                        <p className={`text-sm font-bold opacity-40 ${style.sub}`}>Verified Partner</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                )}
+
                 {/* Refined Footer */}
                 <footer className="w-full pt-32 pb-20 border-t border-white/5 animate-in fade-in duration-1000 delay-700">
                     <div className="flex flex-col items-center gap-16">
@@ -774,38 +841,60 @@ export default function PublicProductPage() {
 
                             {checkoutStep === "success" && (
                                 <div className="py-12 flex flex-col items-center text-center space-y-12 animate-in zoom-in-95 duration-1000">
-                                    <div className="w-32 h-32 bg-emerald-500 text-white rounded-[40px] flex items-center justify-center shadow-[0_40px_80px_-20px_rgba(16,185,129,0.5)] rotate-6 animate-in zoom-in duration-700">
-                                        <Check size={64} strokeWidth={4} />
-                                    </div>
-                                    <div className="space-y-6">
-                                        <h2 className="text-5xl md:text-6xl font-black tracking-tight text-slate-950 leading-[0.9]">Experience Unlocked</h2>
-                                        <p className="text-slate-500 font-bold text-xl leading-relaxed max-w-sm mx-auto">Your access credentials have been dispatched to <span className="text-slate-950 underline underline-offset-4 decoration-emerald-500/30">{email}</span>.</p>
-                                    </div>
-                                    <div className="w-full pt-8 px-4 space-y-4">
-                                        <button
-                                            onClick={() => {
-                                                if (formData.digitalFilesLink) {
-                                                    window.open(formData.digitalFilesLink.startsWith('http') ? formData.digitalFilesLink : `https://${formData.digitalFilesLink}`, '_blank');
-                                                } else {
-                                                    setShowCheckout(false);
-                                                }
-                                            }}
-                                            className="w-full py-8 rounded-[32px] bg-slate-950 text-white font-black text-xl hover:scale-[1.02] hover:-translate-y-1 active:scale-95 transition-all shadow-2xl relative overflow-hidden group/success"
-                                        >
-                                            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover/success:opacity-100 transition-opacity" />
-                                            <span className="relative">{formData.digitalFilesLink ? "Download Resources" : "Access Dashboard"}</span>
-                                        </button>
+                                    {formData.customRedirectToggle && formData.customRedirectUrl ? (
+                                        <div className="space-y-8">
+                                            <div className="w-24 h-24 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-xl mx-auto animate-pulse">
+                                                <RefreshCw size={40} className="animate-spin" />
+                                            </div>
+                                            <div className="space-y-4">
+                                                <h2 className="text-3xl font-black">Redirecting you...</h2>
+                                                <p className="text-slate-500 font-bold">Please wait while we take you to your destination.</p>
+                                            </div>
+                                            {(() => {
+                                                setTimeout(() => {
+                                                    window.location.href = formData.customRedirectUrl!.startsWith('http') ? formData.customRedirectUrl! : `https://${formData.customRedirectUrl}`;
+                                                }, 3000);
+                                                return null;
+                                            })()}
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="w-32 h-32 bg-emerald-500 text-white rounded-[40px] flex items-center justify-center shadow-[0_40px_80px_-20px_rgba(16,185,129,0.5)] rotate-6 animate-in zoom-in duration-700">
+                                                <Check size={64} strokeWidth={4} />
+                                            </div>
+                                            <div className="space-y-6">
+                                                <h2 className="text-5xl md:text-6xl font-black tracking-tight text-slate-950 leading-[0.9]">
+                                                    {formData.successMessageTitle || "Experience Unlocked"}
+                                                </h2>
+                                                <p className="text-slate-500 font-bold text-xl leading-relaxed max-w-sm mx-auto">
+                                                    {formData.successMessage || (
+                                                        <>Your access credentials have been dispatched to <span className="text-slate-950 underline underline-offset-4 decoration-emerald-500/30">{email}</span>.</>
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <div className="w-full pt-8 px-4 space-y-4">
+                                                {formData.digitalFilesLink && (
+                                                    <button
+                                                        onClick={() => {
+                                                            window.open(formData.digitalFilesLink!.startsWith('http') ? formData.digitalFilesLink : `https://${formData.digitalFilesLink}`, '_blank');
+                                                        }}
+                                                        className="w-full py-8 rounded-[32px] bg-slate-950 text-white font-black text-xl hover:scale-[1.02] hover:-translate-y-1 active:scale-95 transition-all shadow-2xl relative overflow-hidden group/success"
+                                                    >
+                                                        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover/success:opacity-100 transition-opacity" />
+                                                        <span className="relative">Download Resources</span>
+                                                    </button>
+                                                )}
 
-                                        {formData.digitalFilesLink && (
-                                            <button
-                                                onClick={() => setShowCheckout(false)}
-                                                className="w-full py-4 rounded-[24px] bg-white border border-slate-100 text-slate-400 font-bold text-sm hover:bg-slate-50 transition-all uppercase tracking-widest"
-                                            >
-                                                Close
-                                            </button>
-                                        )}
-                                    </div>
-                                    <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.4em]">Transaction: #SP-{Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+                                                <button
+                                                    onClick={() => setShowCheckout(false)}
+                                                    className="w-full py-4 rounded-[24px] bg-white border border-slate-100 text-slate-400 font-bold text-sm hover:bg-slate-50 transition-all uppercase tracking-widest"
+                                                >
+                                                    Close
+                                                </button>
+                                            </div>
+                                            <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.4em]">Transaction: #SP-{Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>

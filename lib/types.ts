@@ -85,4 +85,10 @@ export interface FormData {
     deactivateSales?: boolean;
     trackingToggle?: boolean;
     brandColor?: string;
+
+    // Post-Purchase
+    customRedirectToggle?: boolean;
+    customRedirectUrl?: string;
+    successMessageTitle?: string;
+    successMessage?: string;
 }
