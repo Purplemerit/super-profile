@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
+import Script from "next/script";
 import { FormData, Product } from "@/lib/types";
 import {
     Check, X, Plus, HelpCircle, Mail, Phone, Users, Instagram, Twitter, Globe,
@@ -84,16 +85,6 @@ export default function PublicProductPage() {
             script2.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', '${formData.googleAnalyticsId}');`;
             document.head.appendChild(script2);
         }
-
-        // 3. Inject Razorpay Script
-        const rzpScript = document.createElement("script");
-        rzpScript.src = "https://checkout.razorpay.com/v1/checkout.js";
-        rzpScript.async = true;
-        document.head.appendChild(rzpScript);
-
-        return () => {
-            document.head.removeChild(rzpScript);
-        };
     }, [formData?.metaPixelId, formData?.googleAnalyticsId]);
 
     if (loading) return (
@@ -304,14 +295,20 @@ export default function PublicProductPage() {
             const order = await res.json();
 
             if (!order.id) {
-                alert("Payment initiation failed. Please try again.");
+                console.error("Order creation failed:", order);
+                alert(`Order creation failed: ${order.error || "Unknown error"}`);
                 return;
             }
 
             // 2. Open Razorpay Checkout
+            if (!(window as any).Razorpay) {
+                alert("Razorpay SDK not loaded. Please check your connection or disable adblockers.");
+                return;
+            }
+
             const options = {
-                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_placeholder",
-                amount: order.amount,
+                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_S2chnbRxpJ0zJI",
+                amount: order.amount, // Use amount from the created order (already in paise)
                 currency: order.currency,
                 name: formData?.title || "SuperProfile",
                 description: "Purchase for " + (selectedProduct?.title || formData?.title),
@@ -327,16 +324,24 @@ export default function PublicProductPage() {
                     contact: phone,
                 },
                 theme: {
-                    color: brandColor,
+                    color: brandColor || "#000000",
                 },
+                modal: {
+                    ondismiss: function () {
+                        console.log("Checkout modal closed");
+                    }
+                }
             };
 
             const rzp = new (window as any).Razorpay(options);
+            rzp.on('payment.failed', function (response: any) {
+                alert("Payment Failed: " + response.error.description);
+            });
             rzp.open();
 
-        } catch (err) {
+        } catch (err: any) {
             console.error("Payment Error:", err);
-            alert("Payment gateway unreachable.");
+            alert("Payment gateway unreachable: " + (err.message || "Unknown error"));
         }
     };
 
@@ -919,6 +924,7 @@ export default function PublicProductPage() {
                     </div>
                 </div>
             )}
+            <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
         </div>
     );
 }
