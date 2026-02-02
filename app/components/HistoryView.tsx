@@ -14,6 +14,7 @@ export default function HistoryView({ websites, onOpenCreateModal, onDelete }: H
     const [searchQuery, setSearchQuery] = useState("");
     const [activeTab, setActiveTab] = useState("All");
     const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+    const [sortBy, setSortBy] = useState<"recent" | "revenue" | "sales">("recent");
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
     // Close menu on click outside
@@ -24,7 +25,7 @@ export default function HistoryView({ websites, onOpenCreateModal, onDelete }: H
     }, []);
 
     const filteredWebsites = useMemo(() => {
-        return websites.filter(site => {
+        let result = websites.filter(site => {
             const matchesSearch = site.title.toLowerCase().includes(searchQuery.toLowerCase());
             let matchesTab = activeTab === "All";
             if (!matchesTab) {
@@ -36,14 +37,32 @@ export default function HistoryView({ websites, onOpenCreateModal, onDelete }: H
             }
             return matchesSearch && matchesTab;
         });
-    }, [websites, searchQuery, activeTab]);
+
+        // Apply Sorting
+        return [...result].sort((a, b) => {
+            if (sortBy === "revenue") {
+                const revA = parseInt((a as any).revenue?.replace(/[^\d]/g, '') || '0');
+                const revB = parseInt((b as any).revenue?.replace(/[^\d]/g, '') || '0');
+                return revB - revA;
+            }
+            if (sortBy === "sales") {
+                const saleA = parseInt((a as any).sale || '0');
+                const saleB = parseInt((b as any).sale || '0');
+                return saleB - saleA;
+            }
+            // Default: Recent (In a real app, use timestamp. Here we use index or a mock lastModified if possible)
+            return 0;
+        });
+    }, [websites, searchQuery, activeTab, sortBy]);
 
     const stats = useMemo(() => {
+        const totalRev = websites.reduce((acc, site) => acc + parseInt((site as any).revenue?.replace(/[^\d]/g, '') || '0'), 0);
         return {
             total: websites.length,
             published: websites.filter(s => s.status === "Active" || s.status === "Published").length,
             drafts: websites.filter(s => s.status === "Draft").length,
             unpublished: websites.filter(s => s.status === "Pending").length,
+            revenue: totalRev.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
         };
     }, [websites]);
 
@@ -64,24 +83,30 @@ export default function HistoryView({ websites, onOpenCreateModal, onDelete }: H
             <div className="max-w-6xl mx-auto px-6 -mt-8 relative z-10 space-y-6">
                 {/* Stats / Controls */}
                 <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex gap-2">
-                        {[
-                            { name: "All", count: stats.total },
-                            { name: "Active", label: "Published", count: stats.published },
-                            { name: "Pending", label: "Unpublished", count: stats.unpublished },
-                            { name: "Draft", label: "Drafts", count: stats.drafts }
-                        ].map((tab) => {
-                            const isActive = activeTab === tab.name;
-                            return (
-                                <button
-                                    key={tab.name}
-                                    onClick={() => setActiveTab(tab.name)}
-                                    className={`px-5 py-2 rounded-full text-[12px] font-black border transition-all ${isActive ? "bg-black text-white border-black" : "bg-white text-gray-400 border-gray-100 hover:border-gray-300"}`}
-                                >
-                                    {tab.label || tab.name} ({tab.count})
-                                </button>
-                            );
-                        })}
+                    <div className="flex items-center gap-6">
+                        <div className="flex gap-2 border-r border-gray-100 pr-6">
+                            {[
+                                { name: "All", count: stats.total },
+                                { name: "Active", label: "Published", count: stats.published },
+                                { name: "Pending", label: "Unpublished", count: stats.unpublished },
+                                { name: "Draft", label: "Drafts", count: stats.drafts }
+                            ].map((tab) => {
+                                const isActive = activeTab === tab.name;
+                                return (
+                                    <button
+                                        key={tab.name}
+                                        onClick={() => setActiveTab(tab.name)}
+                                        className={`px-5 py-2 rounded-full text-[12px] font-black border transition-all ${isActive ? "bg-black text-white border-black" : "bg-white text-gray-400 border-gray-100 hover:border-gray-300"}`}
+                                    >
+                                        {tab.label || tab.name} ({tab.count})
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Revenue</span>
+                            <span className="text-[18px] font-black text-green-600">{stats.revenue}</span>
+                        </div>
                     </div>
                     <button
                         onClick={onOpenCreateModal}
@@ -101,8 +126,19 @@ export default function HistoryView({ websites, onOpenCreateModal, onDelete }: H
                             placeholder="Find a website..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-xl text-[13px] outline-none focus:border-black transition-colors"
+                            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-xl text-[13px] outline-none focus:border-black transition-colors shadow-sm"
                         />
+                    </div>
+                    <div className="flex bg-white border border-gray-100 rounded-xl p-1 shadow-sm">
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as any)}
+                            className="bg-transparent border-none text-[12px] font-black px-4 outline-none cursor-pointer"
+                        >
+                            <option value="recent">Recently Edited</option>
+                            <option value="revenue">Highest Revenue</option>
+                            <option value="sales">Most Sales</option>
+                        </select>
                     </div>
                     <div className="flex bg-white border border-gray-100 rounded-xl p-1 shadow-sm">
                         <button
@@ -143,7 +179,21 @@ export default function HistoryView({ websites, onOpenCreateModal, onDelete }: H
                                         </div>
                                         <div className={`space-y-0.5 ${viewMode === "grid" ? "p-5" : ""}`}>
                                             <h4 className="text-[15px] font-bold text-gray-900 leading-tight group-hover:text-blue-600 transition-colors">{site.title}</h4>
-                                            <p className="text-[11px] text-gray-400 font-medium tracking-tight">Edited {site.lastModified || "Just now"}</p>
+                                            <div className="flex items-center gap-3">
+                                                <p className="text-[11px] text-gray-400 font-medium tracking-tight">Edited {site.lastModified || "Just now"}</p>
+                                                {viewMode === "list" && (
+                                                    <div className="flex items-center gap-4 border-l border-gray-100 ml-3 pl-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[9px] font-black text-gray-300 uppercase tracking-tighter">Sales</span>
+                                                            <span className="text-[12px] font-black">{(site as any).sale || 0}</span>
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[9px] font-black text-gray-300 uppercase tracking-tighter">Revenue</span>
+                                                            <span className="text-[12px] font-black text-green-600">{(site as any).revenue || "₹0"}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -172,7 +222,7 @@ export default function HistoryView({ websites, onOpenCreateModal, onDelete }: H
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            window.location.href = `/builder/${site.type || 'digital'}`;
+                                                            window.location.href = `/builder/${site.type || 'digital'}?edit=${(site as any).slug || i}`;
                                                         }}
                                                         className="w-full px-4 py-2.5 text-left text-[13px] font-black text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                                                     >

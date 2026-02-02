@@ -64,6 +64,10 @@ export default function App() {
 
     const handleDelete = (index: number) => {
         if (index === -1) return;
+        const target = websites[index] as any;
+        if (target && target.slug) {
+            localStorage.removeItem(`website_${target.slug}`);
+        }
         const newList = [...websites];
         newList.splice(index, 1);
         setWebsites(newList);

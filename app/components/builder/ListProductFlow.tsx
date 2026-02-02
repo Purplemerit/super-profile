@@ -1,8 +1,9 @@
 "use client";
 
-import { X, ChevronDown, Check, Upload, Bold, Italic, Underline, AlignLeft, List as ListIcon, Trash2, Edit3, Globe, Copy, Info, RefreshCw, Plus } from "lucide-react";
+import { X, ChevronDown, Check, Upload, Bold, Italic, Underline, AlignLeft, List as ListIcon, Trash2, Edit3, Globe, Copy, Info, RefreshCw, Plus, Mail, Phone } from "lucide-react";
 import { useState, useEffect } from "react";
 import { FormData, Product } from "@/lib/types";
+import { uploadToS3 } from "@/lib/upload";
 
 interface ListProductFlowProps {
    formData: FormData;
@@ -25,7 +26,10 @@ export default function ListProductFlow({
 
    const [isPublishing, setIsPublishing] = useState(false);
    const [publishingStep, setPublishingStep] = useState(0);
+   const [isUploading, setIsUploading] = useState(false);
    const [currentHost, setCurrentHost] = useState("");
+   const [tempImageUrl, setTempImageUrl] = useState("");
+   const descRef = useState<HTMLTextAreaElement | null>(null)[0]; // Placeholder for ref logic
 
    useEffect(() => {
       if (typeof window !== "undefined") {
@@ -63,6 +67,17 @@ export default function ListProductFlow({
       const updatedList = [websiteEntry, ...existingList.filter((site: any) => site.slug !== slug)];
       localStorage.setItem('websites_list', JSON.stringify(updatedList));
 
+      // SYNC TO S3 FOR SEARCH OPTIMIZATION
+      try {
+         await fetch('/api/websites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ formData, websiteEntry })
+         });
+      } catch (err) {
+         console.error("Failed to sync to S3 index:", err);
+      }
+
       setIsPublishing(false);
       setIsLive(true);
    };
@@ -98,7 +113,7 @@ export default function ListProductFlow({
    }
 
    if (isLive) {
-      const slug = formData.title?.toLowerCase().replace(/[^a-z0-9]/g, '-') || "my-collection";
+      const slug = formData.customPageUrl || formData.title?.toLowerCase().replace(/[^a-z0-9]/g, '-') || "my-collection";
       return (
          <div className="fixed inset-0 z-[100] bg-white animate-in fade-in duration-500 flex flex-col items-center justify-center p-12">
             <div className="max-w-xl w-full flex flex-col items-center text-center space-y-8 py-12">
@@ -154,14 +169,23 @@ export default function ListProductFlow({
       );
    }
 
-   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
       const file = e.target.files?.[0];
       if (file) {
-         const reader = new FileReader();
-         reader.onloadend = () => {
-            setFormData({ ...formData, [field]: reader.result as string });
-         };
-         reader.readAsDataURL(file);
+         // Optimistic Update: Show local image immediately
+         const localUrl = URL.createObjectURL(file);
+         setFormData({ ...formData, [field]: localUrl });
+
+         setIsUploading(true);
+         try {
+            const s3Url = await uploadToS3(file, field);
+            setFormData((prev: FormData) => ({ ...prev, [field]: s3Url }));
+         } catch (err) {
+            console.error("Upload error:", err);
+            alert("Failed to upload image.");
+         } finally {
+            setIsUploading(false);
+         }
       }
    };
 
@@ -188,6 +212,9 @@ export default function ListProductFlow({
                   <X size={20} className="text-gray-400" />
                </button>
             </div>
+            {isUploading && (
+               <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-500 animate-pulse" />
+            )}
          </header>
 
          <main className="pt-32 pb-40 px-6 max-w-4xl mx-auto flex flex-col items-center">
@@ -260,8 +287,23 @@ export default function ListProductFlow({
                            <div className="h-[1px] flex-1 bg-gray-100" />
                         </div>
                         <div className="flex items-center gap-2 w-full max-w-sm bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 z-10 backdrop-blur-sm" onClick={e => e.stopPropagation()}>
-                           <input className="flex-1 bg-transparent px-4 py-2 text-[12px] font-bold outline-none" placeholder="Add the link" />
-                           <button className="px-5 py-2.5 bg-white border border-gray-100 rounded-xl text-[11px] font-black shadow-sm">Add Link</button>
+                           <input
+                              className="flex-1 bg-transparent px-4 py-2 text-[12px] font-bold outline-none"
+                              placeholder="Add the link"
+                              value={tempImageUrl}
+                              onChange={e => setTempImageUrl(e.target.value)}
+                           />
+                           <button
+                              onClick={() => {
+                                 if (tempImageUrl) {
+                                    setFormData({ ...formData, coverImage: tempImageUrl });
+                                    setTempImageUrl("");
+                                 }
+                              }}
+                              className="px-5 py-2.5 bg-white border border-gray-100 rounded-xl text-[11px] font-black shadow-sm"
+                           >
+                              Add Link
+                           </button>
                         </div>
                      </div>
                   </div>
@@ -276,12 +318,55 @@ export default function ListProductFlow({
                               <ChevronDown size={14} className="text-gray-400" />
                            </div>
                            <div className="flex items-center gap-1">
-                              <button className="p-1.5 hover:bg-white rounded transition-all"><Bold size={16} className="text-gray-400" /></button>
-                              <button className="p-1.5 hover:bg-white rounded transition-all"><Italic size={16} className="text-gray-400" /></button>
-                              <button className="p-1.5 hover:bg-white rounded transition-all"><Underline size={16} className="text-gray-400" /></button>
+                              <button
+                                 onClick={() => {
+                                    const el = document.getElementById('desc-area') as HTMLTextAreaElement;
+                                    const start = el.selectionStart;
+                                    const end = el.selectionEnd;
+                                    const text = el.value;
+                                    const before = text.substring(0, start);
+                                    const selection = text.substring(start, end);
+                                    const after = text.substring(end);
+                                    setFormData({ ...formData, description: `${before}**${selection}**${after}` });
+                                 }}
+                                 className="p-1.5 hover:bg-white rounded transition-all"
+                              >
+                                 <Bold size={16} className="text-gray-900" />
+                              </button>
+                              <button
+                                 onClick={() => {
+                                    const el = document.getElementById('desc-area') as HTMLTextAreaElement;
+                                    const start = el.selectionStart;
+                                    const end = el.selectionEnd;
+                                    const text = el.value;
+                                    const before = text.substring(0, start);
+                                    const selection = text.substring(start, end);
+                                    const after = text.substring(end);
+                                    setFormData({ ...formData, description: `${before}_${selection}_${after}` });
+                                 }}
+                                 className="p-1.5 hover:bg-white rounded transition-all"
+                              >
+                                 <Italic size={16} className="text-gray-900" />
+                              </button>
+                              <button
+                                 onClick={() => {
+                                    const el = document.getElementById('desc-area') as HTMLTextAreaElement;
+                                    const start = el.selectionStart;
+                                    const end = el.selectionEnd;
+                                    const text = el.value;
+                                    const before = text.substring(0, start);
+                                    const selection = text.substring(start, end);
+                                    const after = text.substring(end);
+                                    setFormData({ ...formData, description: `${before}<u>${selection}</u>${after}` });
+                                 }}
+                                 className="p-1.5 hover:bg-white rounded transition-all"
+                              >
+                                 <Underline size={16} className="text-gray-900" />
+                              </button>
                            </div>
                         </div>
                         <textarea
+                           id="desc-area"
                            className="w-full h-48 px-6 py-5 text-[14px] font-bold outline-none border-none resize-none placeholder:text-gray-200 font-sans"
                            placeholder="Add description..."
                            value={formData.description}
@@ -478,7 +563,7 @@ export default function ListProductFlow({
                                        {prod.image ? <img src={prod.image} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100 flex items-center justify-center"><ListIcon size={30} className="text-gray-200" /></div>}
                                     </div>
                                     <div className="flex-1 space-y-1">
-                                       <h4 className="text-[15px] font-black text-gray-900">{prod.title}</h4>
+                                       <h4 className="text-[15px] font-black text-gray-900 break-words">{prod.title}</h4>
                                        <p className="text-[12px] font-bold text-gray-400">Digital Files | 1 media</p>
                                        <div className="flex items-center gap-2 pt-1">
                                           <span className="text-[14px] font-black">₹{prod.price}</span>
@@ -505,7 +590,7 @@ export default function ListProductFlow({
                                     {formData.digitalFilesImage ? <img src={formData.digitalFilesImage} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100 flex items-center justify-center"><ListIcon size={30} className="text-gray-200" /></div>}
                                  </div>
                                  <div className="flex-1 space-y-1">
-                                    <h4 className="text-[15px] font-black text-gray-900">{formData.productTitle || formData.title || "My Class Food"}</h4>
+                                    <h4 className="text-[15px] font-black text-gray-900 break-words">{formData.productTitle || formData.title || "My Class Food"}</h4>
                                     <p className="text-[12px] font-bold text-gray-400">Digital Files | 1 media</p>
                                     <p className="text-[12px] font-bold text-gray-400">Unlimited stock</p>
                                     <div className="flex items-center gap-2 pt-1">
@@ -595,14 +680,12 @@ export default function ListProductFlow({
                      </div>
                   </div>
 
-                  {/* Toggles Section */}
                   <div className="space-y-8 pt-4">
                      {[
-                        { id: 'pageExpiry', title: 'Page Expiry', sub: 'Turning on this option will make the page and its content expire after a defined period of time.' },
-                        { id: 'termsAndConditions', title: 'Terms and Conditions', sub: 'You can add your own terms & conditions in addition to the default terms applied by SuperProfile' },
-                        { id: 'darkTheme', title: 'Dark theme', sub: '' },
-                        { id: 'deactivateSales', title: 'Deactivate sales', sub: '' },
-                        { id: 'trackingToggle', title: 'Tracking', sub: '' }
+                        { id: 'darkTheme', title: 'Dark Theme', sub: 'Switch to a premium dark aesthetic for your entire page.' },
+                        { id: 'deactivateSales', title: 'Deactivate Sales', sub: 'Temporarily stop accepting new orders while keeping the page live.' },
+                        { id: 'pageExpiry', title: 'Page Expiry', sub: 'Automatically hide the buy buttons after a specific date.' },
+                        { id: 'trackingToggle', title: 'Advanced Tracking', sub: 'Enable detailed visitor analytics and pixel tracking.' }
                      ].map((item) => (
                         <div key={item.id} className="flex items-center justify-between group">
                            <div className="space-y-1 pr-10">
@@ -610,13 +693,84 @@ export default function ListProductFlow({
                               {item.sub && <p className="text-[13px] font-bold text-gray-400 leading-relaxed max-w-md">{item.sub}</p>}
                            </div>
                            <div
-                              onClick={() => setFormData({ ...formData, [item.id]: !(formData as any)[item.id] })}
-                              className={`w-14 h-8 rounded-full transition-all relative cursor-pointer flex-shrink-0 ${(formData as any)[item.id] ? 'bg-[#2ECC71]' : 'bg-gray-100'}`}
+                              onClick={() => setFormData({ ...formData, [item.id]: !((formData as any)[item.id]) })}
+                              className={`w-14 h-8 rounded-full transition-all relative cursor-pointer flex-shrink-0 ${((formData as any)[item.id]) ? 'bg-black' : 'bg-gray-100'}`}
                            >
-                              <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all ${(formData as any)[item.id] ? 'left-7' : 'left-1'}`} />
+                              <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all ${((formData as any)[item.id]) ? 'left-7' : 'left-1'}`} />
                            </div>
                         </div>
                      ))}
+                  </div>
+
+                  {formData.trackingToggle && (
+                     <div className="space-y-8 pt-6 pb-6 animate-in slide-in-from-top-4 duration-500 border-t border-gray-50 mt-4">
+                        <div className="space-y-5">
+                           <div className="space-y-1">
+                              <h3 className="text-[14px] font-black text-gray-900">Meta Pixel</h3>
+                              <p className="text-[12px] font-bold text-gray-400">Add your Meta Pixel IDs to get crucial visitor-level data.</p>
+                           </div>
+                           <input
+                              className="w-full px-5 py-4 bg-white border border-gray-100 rounded-[16px] text-[13px] font-bold outline-none focus:border-black transition-all shadow-sm"
+                              placeholder="Enter Pixel ID"
+                              value={formData.metaPixelId || ""}
+                              onChange={e => setFormData({ ...formData, metaPixelId: e.target.value })}
+                           />
+                        </div>
+
+                        <div className="space-y-5">
+                           <div className="space-y-1">
+                              <h3 className="text-[14px] font-black text-gray-900">Google Analytics</h3>
+                              <p className="text-[12px] font-bold text-gray-400">Add your Measurement IDs to track visitors.</p>
+                           </div>
+                           <input
+                              className="w-full px-5 py-4 bg-white border border-gray-100 rounded-[16px] text-[13px] font-bold outline-none focus:border-black transition-all shadow-sm"
+                              placeholder="G-XXXXXXXXXX"
+                              value={formData.googleAnalyticsId || ""}
+                              onChange={e => setFormData({ ...formData, googleAnalyticsId: e.target.value })}
+                           />
+                        </div>
+                     </div>
+                  )}
+
+                  <div className="space-y-8 pt-10 border-t border-gray-100">
+                     <h3 className="text-[14px] font-black text-gray-400 uppercase tracking-widest">Customer Information</h3>
+                     <div className="space-y-4">
+                        <div className="flex items-center justify-between p-6 bg-white border border-gray-100 rounded-[28px] shadow-sm hover:border-black/20 transition-all">
+                           <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                                 <Mail size={22} />
+                              </div>
+                              <div className="space-y-0.5">
+                                 <p className="text-[16px] font-black text-gray-900">Email Verification</p>
+                                 <p className="text-[12px] font-bold text-gray-400">Buyers must verify their email before buying</p>
+                              </div>
+                           </div>
+                           <div
+                              onClick={() => setFormData({ ...formData, emailVerification: !formData.emailVerification })}
+                              className={`w-14 h-8 rounded-full transition-all relative cursor-pointer ${formData.emailVerification ? 'bg-black' : 'bg-gray-100'}`}
+                           >
+                              <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all ${formData.emailVerification ? 'left-7' : 'left-1'}`} />
+                           </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-6 bg-white border border-gray-100 rounded-[28px] shadow-sm hover:border-black/20 transition-all">
+                           <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center">
+                                 <Phone size={22} />
+                              </div>
+                              <div className="space-y-0.5">
+                                 <p className="text-[16px] font-black text-gray-900">Phone Verification</p>
+                                 <p className="text-[12px] font-bold text-gray-400">Required Verified OTP during checkout</p>
+                              </div>
+                           </div>
+                           <div
+                              onClick={() => setFormData({ ...formData, phoneVerification: !formData.phoneVerification })}
+                              className={`w-14 h-8 rounded-full transition-all relative cursor-pointer ${formData.phoneVerification ? 'bg-black' : 'bg-gray-200'}`}
+                           >
+                              <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all ${formData.phoneVerification ? 'left-7' : 'left-1'}`} />
+                           </div>
+                        </div>
+                     </div>
                   </div>
                </div>
             ) : null}

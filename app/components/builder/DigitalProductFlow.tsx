@@ -3,11 +3,12 @@
 import {
     X, ChevronDown, Check, Laptop, Smartphone, Copy, Globe, Edit3, Palette, Users, ImageIcon,
     Upload, Bold, Italic, Underline, AlignLeft, MoreHorizontal, HelpCircle, Info, Layout, Store,
-    Instagram, Twitter, Settings, Shield, Mail, Phone, ExternalLink, Eye, RefreshCw, GripVertical, Plus
+    Instagram, Twitter, Settings, Shield, Mail, Phone, ExternalLink, Eye, RefreshCw, GripVertical, Plus, ArrowRight
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { FormData } from "@/lib/types";
 import DevicePreview from "./DevicePreview";
+import { uploadToS3 } from "@/lib/upload";
 
 interface DigitalProductFlowProps {
     formData: FormData;
@@ -31,6 +32,7 @@ export default function DigitalProductFlow({
     const [publishingStep, setPublishingStep] = useState(0);
     const [tempCoverLink, setTempCoverLink] = useState("");
     const [tempTestimonialLink, setTempTestimonialLink] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
 
     const [currentHost, setCurrentHost] = useState("");
 
@@ -70,19 +72,51 @@ export default function DigitalProductFlow({
         const updatedList = [websiteEntry, ...existingList.filter((site: any) => site.slug !== slug)];
         localStorage.setItem('websites_list', JSON.stringify(updatedList));
 
+        // SYNC TO S3 FOR SEARCH OPTIMIZATION
+        try {
+            await fetch('/api/websites', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ formData, websiteEntry })
+            });
+        } catch (err) {
+            console.error("Failed to sync to S3 index:", err);
+        }
+
         setIsPublishing(false);
         setIsLive(true);
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string, isArray: boolean = false) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string, isArray: boolean = false) => {
         const file = e.target.files?.[0];
         if (file) {
-            const url = URL.createObjectURL(file);
+            // Optimistic Update: Show local image immediately
+            const localUrl = URL.createObjectURL(file);
             if (isArray) {
                 const currentArr = (formData as any)[field] || [];
-                setFormData({ ...formData, [field]: [...currentArr, url] });
+                setFormData({ ...formData, [field]: [...currentArr, localUrl] });
             } else {
-                setFormData({ ...formData, [field]: url });
+                setFormData({ ...formData, [field]: localUrl });
+            }
+
+            setIsUploading(true);
+            try {
+                const s3Url = await uploadToS3(file, field);
+                // Replace local URL with S3 URL
+                setFormData((prev: FormData) => {
+                    if (isArray) {
+                        const currentArr = (prev as any)[field] || [];
+                        return { ...prev, [field]: currentArr.map((url: string) => url === localUrl ? s3Url : url) };
+                    } else {
+                        return { ...prev, [field]: s3Url };
+                    }
+                });
+            } catch (err) {
+                console.error("Upload error:", err);
+                alert("Failed to upload image. Please check your S3 configuration.");
+                // Revert to placeholder or remove broken local link if desired
+            } finally {
+                setIsUploading(false);
             }
         }
     };
@@ -123,20 +157,39 @@ export default function DigitalProductFlow({
         setFormData({ ...formData, products: newProducts });
     };
 
-    const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
+    const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
         const file = e.target.files?.[0];
         if (file) {
-            const url = URL.createObjectURL(file);
-            updateProduct(id, 'image', url);
+            // Optimistic Update
+            const localUrl = URL.createObjectURL(file);
+            updateProduct(id, 'image', localUrl);
+
+            setIsUploading(true);
+            try {
+                const s3Url = await uploadToS3(file, 'products');
+                updateProduct(id, 'image', s3Url);
+            } catch (err) {
+                console.error("Upload error:", err);
+                alert("Failed to upload image.");
+            } finally {
+                setIsUploading(false);
+            }
         }
     };
 
     return (
         <div className="flex h-screen bg-[#F8F9FA] text-[#1A1A1A] overflow-hidden font-sans">
             {/* Main Preview Area */}
-            <div className="flex-1 flex flex-col items-center justify-center p-12 bg-gray-100/50 relative">
-                <div className="absolute top-8 left-8 flex items-center gap-2 bg-white/80 backdrop-blur px-3 py-1.5 rounded-xl border border-white shadow-sm">
-                    <span className="text-[10px] font-black uppercase text-gray-400">Preview Mode</span>
+            <div className={`flex-1 flex flex-col items-center justify-center p-12 bg-gray-100/50 relative ${isUploading ? 'cursor-wait' : ''}`}>
+                <div className="absolute top-8 left-8 flex items-center gap-2 bg-white/80 backdrop-blur px-3 py-1.5 rounded-xl border border-white shadow-sm z-50">
+                    {isUploading ? (
+                        <>
+                            <RefreshCw className="animate-spin text-blue-500" size={10} />
+                            <span className="text-[10px] font-black uppercase text-blue-500 tracking-wider">Uploading to S3...</span>
+                        </>
+                    ) : (
+                        <span className="text-[10px] font-black uppercase text-gray-400">Preview Mode</span>
+                    )}
                 </div>
 
                 <div className="absolute top-8 right-8 flex bg-white rounded-xl shadow-sm p-1 border border-gray-100 z-10">
@@ -148,40 +201,45 @@ export default function DigitalProductFlow({
                     <div
                         className={`flex-1 flex flex-col items-center text-center h-full py-16 px-8 overflow-y-auto scrollbar-hide relative transition-all duration-700 ${formData.themeId === 'tech' ? 'bg-[#0F172A] text-white' :
                             formData.themeId === 'dawn' ? 'bg-[#FFF7ED]' :
-                                formData.themeId === 'dusk' ? 'bg-[#1E1B4B]' : 'bg-white'
+                                formData.themeId === 'dusk' ? 'bg-[#1E1B4B]' :
+                                    formData.themeId === 'modern' ? (formData.darkTheme ? 'bg-[#111111] text-white' : 'bg-[#FAFAFA]') :
+                                        formData.themeId === 'glass' ? (formData.darkTheme ? 'bg-[#0A0A0A] text-white' : 'bg-indigo-50/10') :
+                                            (formData.darkTheme ? 'bg-[#121212] text-white' : 'bg-white')
                             }`}
                         style={{
-                            backgroundImage: formData.customBgImage ? `linear-gradient(rgba(${formData.themeId === 'tech' || formData.themeId === 'dusk' ? '0,0,0' : '255,255,255'}, 0.8), rgba(${formData.themeId === 'tech' || formData.themeId === 'dusk' ? '0,0,0' : '255,255,255'}, 0.8)), url(${formData.customBgImage})` : 'none',
+                            backgroundImage: formData.customBgImage ? `linear-gradient(rgba(${formData.darkTheme || formData.themeId === 'tech' || formData.themeId === 'dusk' ? '0,0,0' : '255,255,255'}, 0.8), rgba(${formData.darkTheme || formData.themeId === 'tech' || formData.themeId === 'dusk' ? '0,0,0' : '255,255,255'}, 0.8)), url(${formData.customBgImage})` : 'none',
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
                             fontFamily: formData.themeId === 'tech' ? "'Space Mono', monospace" : "inherit",
-                            color: (formData.themeId === 'tech' || formData.themeId === 'dusk') ? '#F8FAFC' : '#1A1A1A'
+                            color: (formData.darkTheme || formData.themeId === 'tech' || formData.themeId === 'dusk') ? '#F8FAFC' : '#1A1A1A'
                         }}
                     >
                         <div className="flex flex-col items-center w-full space-y-12 min-h-full">
                             {/* Hero */}
-                            <div className="space-y-8 flex flex-col items-center w-full animate-in fade-in duration-700">
+                            <div className="space-y-10 flex flex-col items-center w-full animate-in fade-in duration-1000">
                                 {formData.coverImage && (
-                                    <div className="w-full aspect-video rounded-[32px] overflow-hidden border border-gray-100 shadow-sm animate-in zoom-in-95 duration-500">
+                                    <div className="w-full aspect-video rounded-[40px] overflow-hidden border border-gray-100 shadow-2xl animate-in zoom-in-95 duration-700">
                                         <img src={formData.coverImage} className="w-full h-full object-cover" alt="Cover" />
                                     </div>
                                 )}
-                                <div className="space-y-6 flex flex-col items-center">
-                                    <h2 className={`${device === 'laptop' ? 'text-[32px]' : 'text-[24px]'} font-black leading-tight max-w-md ${formData.themeId === 'tech' ? 'tracking-tighter' : 'tracking-tight'}`}>
-                                        {formData.title || "Your Product Title"}
+                                <div className="space-y-8 flex flex-col items-center text-center">
+                                    <h2 className={`${device === 'laptop' ? 'text-[40px]' : 'text-[28px]'} font-black leading-[1.1] max-w-lg ${formData.themeId === 'tech' ? 'tracking-tighter' : 'tracking-tight'} break-words`}>
+                                        {formData.title || "Your Premium Product"}
                                     </h2>
-                                    <p className={`text-[14px] font-medium max-w-sm ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    <p className={`text-[15px] md:text-lg font-bold max-w-md ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-400' : 'text-gray-500'} opacity-70 break-words whitespace-pre-wrap`}>
                                         {formData.description || "Share the story of your digital product and why it's worth it."}
                                     </p>
                                     <button
-                                        className="px-10 py-4 rounded-full text-[13px] font-black shadow-xl transition-all active:scale-95 hover:opacity-90"
+                                        className="px-14 py-5 rounded-[24px] text-[15px] font-black shadow-2xl transition-all active:scale-95 hover:scale-[1.02]"
                                         style={{
                                             backgroundColor: formData.buttonColor || '#000000',
                                             color: formData.buttonTextColor || '#FFFFFF',
                                             border: formData.themeId === 'tech' ? '1px solid rgba(255,255,255,0.1)' : 'none'
                                         }}
                                     >
-                                        {formData.cta || "Buy Now"}
+                                        <span className="flex items-center gap-2">
+                                            {formData.cta || "Get Instant Access"} <ArrowRight size={18} />
+                                        </span>
                                     </button>
                                 </div>
                             </div>
@@ -211,8 +269,8 @@ export default function DigitalProductFlow({
                                         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
                                             {formData.testimonialImage ? <img src={formData.testimonialImage} className="w-full h-full object-cover" /> : <Users size={24} className="text-gray-300" />}
                                         </div>
-                                        <p className={`font-bold italic leading-relaxed text-[15px] ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-300' : 'text-gray-600'}`}>"{formData.testimonialComment || "No comment yet"}"</p>
-                                        <p className="font-black text-[14px]">— {formData.testimonialName}</p>
+                                        <p className={`font-bold italic leading-relaxed text-[15px] ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-300' : 'text-gray-600'} break-words whitespace-pre-wrap`}>"{formData.testimonialComment || "No comment yet"}"</p>
+                                        <p className="font-black text-[14px] break-words">— {formData.testimonialName}</p>
                                     </div>
                                 </div>
                             )}
@@ -224,8 +282,8 @@ export default function DigitalProductFlow({
                                     <div className="space-y-4">
                                         {formData.faqs.map((faq, i) => (
                                             <div key={i} className={`p-6 border rounded-[20px] text-left shadow-sm ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'bg-white/5 border-white/10' : 'bg-white border-gray-100'}`}>
-                                                <p className="font-black mb-2">{faq.question || `Question ${i + 1}`}</p>
-                                                <p className={`font-medium text-[13px] ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-400' : 'text-gray-500'}`}>{faq.answer || "Answer will appear here..."}</p>
+                                                <p className="font-black mb-2 break-words">{faq.question || `Question ${i + 1}`}</p>
+                                                <p className={`font-medium text-[13px] ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-400' : 'text-gray-500'} break-words whitespace-pre-wrap`}>{faq.answer || "Answer will appear here..."}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -236,7 +294,7 @@ export default function DigitalProductFlow({
                             {formData.aboutUs && (
                                 <div className="w-full pt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <h3 className="text-xl font-black text-left mb-4">About Us</h3>
-                                    <p className={`text-left leading-relaxed text-[14px] ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-400' : 'text-gray-500'}`}>{formData.aboutUs}</p>
+                                    <p className={`text-left leading-relaxed text-[14px] ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-400' : 'text-gray-500'} break-words whitespace-pre-wrap`}>{formData.aboutUs}</p>
                                 </div>
                             )}
 
@@ -250,8 +308,8 @@ export default function DigitalProductFlow({
                                                     {product.image ? <img src={product.image} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400"><Store size={40} /></div>}
                                                 </div>
                                                 <div className="p-8 text-left space-y-3">
-                                                    <h3 className="text-xl font-black">{product.title || "Product Name"}</h3>
-                                                    <p className={`text-[13px] font-medium leading-relaxed ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-400' : 'text-gray-500'}`}>{product.description || "Product description will appear here..."}</p>
+                                                    <h3 className="text-xl font-black break-words">{product.title || "Product Name"}</h3>
+                                                    <p className={`text-[13px] font-medium leading-relaxed ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-400' : 'text-gray-500'} break-words whitespace-pre-wrap`}>{product.description || "Product description will appear here..."}</p>
                                                     <div className="flex items-center justify-between pt-4">
                                                         <span className="text-lg font-black">₹{product.price || "0"}</span>
                                                         <button
@@ -271,8 +329,8 @@ export default function DigitalProductFlow({
                                                 {formData.productImage ? <img src={formData.productImage} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400"><Store size={40} /></div>}
                                             </div>
                                             <div className="p-8 text-left space-y-3">
-                                                <h3 className="text-xl font-black">{formData.productTitle || "Product Name"}</h3>
-                                                <p className={`text-[13px] font-medium leading-relaxed ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-400' : 'text-gray-500'}`}>{formData.productDescription || "Product description will appear here..."}</p>
+                                                <h3 className="text-xl font-black break-words">{formData.productTitle || "Product Name"}</h3>
+                                                <p className={`text-[13px] font-medium leading-relaxed ${formData.themeId === 'tech' || formData.themeId === 'dusk' ? 'text-gray-400' : 'text-gray-500'} break-words whitespace-pre-wrap`}>{formData.productDescription || "Product description will appear here..."}</p>
                                                 <div className="flex items-center justify-between pt-4">
                                                     <span className="text-lg font-black">₹{formData.price || "0"}</span>
                                                     <button
@@ -737,7 +795,17 @@ export default function DigitalProductFlow({
                                             value={formData.digitalFilesLink || ""}
                                             onChange={e => setFormData({ ...formData, digitalFilesLink: e.target.value })}
                                         />
-                                        <button className="px-5 py-2.5 bg-[#F1F3F5] hover:bg-gray-200 rounded-xl text-[11px] font-black transition-all">Add Link</button>
+                                        <button
+                                            onClick={() => {
+                                                if (formData.digitalFilesLink) {
+                                                    setFormData({ ...formData, digitalFilesLink: formData.digitalFilesLink });
+                                                    alert("Link added successfully!");
+                                                }
+                                            }}
+                                            className="px-5 py-2.5 bg-[#F1F3F5] hover:bg-gray-200 rounded-xl text-[11px] font-black transition-all"
+                                        >
+                                            Add Link
+                                        </button>
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <div className="h-[1px] flex-1 bg-gray-100" />
@@ -966,7 +1034,10 @@ export default function DigitalProductFlow({
                                             <p className="text-[15px] font-black text-gray-900 leading-tight">Same Page Checkout</p>
                                             <p className="text-[12px] font-bold text-gray-400">Instant payment without redirects</p>
                                         </div>
-                                        <button className="px-6 py-3 bg-[#F1F5F9] hover:bg-black hover:text-white rounded-full text-[12px] font-black transition-all">
+                                        <button
+                                            onClick={() => alert("Checkout customization coming soon in the next update!")}
+                                            className="px-6 py-3 bg-[#F1F5F9] hover:bg-black hover:text-white rounded-full text-[12px] font-black transition-all"
+                                        >
                                             Customize
                                         </button>
                                     </div>
@@ -1078,41 +1149,75 @@ export default function DigitalProductFlow({
                                 </div>
                             </div>
 
-                            {/* Tracking */}
+                            {/* Additional Settings */}
                             <div className="space-y-8 pt-8 border-t border-gray-100 pb-20">
-                                <h2 className="text-[12px] font-black text-gray-900 uppercase tracking-[0.2em]">Tracking</h2>
+                                <h2 className="text-[12px] font-black text-gray-400 uppercase tracking-[0.2em]">Additional Settings</h2>
 
-                                <div className="space-y-5">
-                                    <div className="space-y-1">
-                                        <h3 className="text-[14px] font-black text-gray-900">Meta Pixel</h3>
-                                        <p className="text-[12px] font-bold text-gray-400">Add your Meta Pixel IDs to get crucial visitor-level data on your Meta dashboard.</p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Pixel ID</label>
-                                        <input
-                                            className="w-full px-5 py-4 bg-white border border-gray-100 rounded-[16px] text-[13px] font-bold outline-none focus:border-black transition-all shadow-sm"
-                                            placeholder="Enter Pixel ID"
-                                            value={formData.metaPixelId || ""}
-                                            onChange={e => setFormData({ ...formData, metaPixelId: e.target.value })}
-                                        />
-                                    </div>
+                                <div className="space-y-6">
+                                    {[
+                                        { id: 'darkTheme', title: 'Dark Theme', sub: 'Switch to a premium dark aesthetic for your entire page.' },
+                                        { id: 'deactivateSales', title: 'Deactivate Sales', sub: 'Temporarily stop accepting new orders while keeping the page live.' },
+                                        { id: 'pageExpiry', title: 'Page Expiry', sub: 'Automatically hide the buy buttons after a specific date.' },
+                                        { id: 'trackingToggle', title: 'Advanced Tracking', sub: 'Enable detailed visitor analytics and pixel tracking.' }
+                                    ].map((item) => (
+                                        <React.Fragment key={item.id}>
+                                            <div className="flex items-center justify-between group">
+                                                <div className="space-y-1.5 pr-8">
+                                                    <h3 className="text-[14px] font-black text-gray-900">{item.title}</h3>
+                                                    {item.sub && <p className="text-[11px] font-bold text-gray-400 leading-relaxed max-w-[320px]">{item.sub}</p>}
+                                                </div>
+                                                <div
+                                                    onClick={() => setFormData({ ...formData, [item.id]: !((formData as any)[item.id]) })}
+                                                    className={`w-12 h-7 rounded-full transition-all relative cursor-pointer flex-shrink-0 ${((formData as any)[item.id]) ? 'bg-black' : 'bg-gray-100'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all ${((formData as any)[item.id]) ? 'left-6' : 'left-1'}`} />
+                                                </div>
+                                            </div>
+                                            {item.id === 'pageExpiry' && formData.pageExpiry && (
+                                                <div className="pl-4 pb-2 animate-in slide-in-from-top-2 duration-300">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Expiry Date</label>
+                                                    <input
+                                                        type="date"
+                                                        className="w-full px-5 py-3 bg-white border border-gray-100 rounded-xl text-[13px] font-bold outline-none focus:border-black shadow-sm"
+                                                        value={formData.pageExpiryDate || ""}
+                                                        onChange={e => setFormData({ ...formData, pageExpiryDate: e.target.value })}
+                                                    />
+                                                </div>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
                                 </div>
 
-                                <div className="space-y-5">
-                                    <div className="space-y-1">
-                                        <h3 className="text-[14px] font-black text-gray-900">Google Analytics</h3>
-                                        <p className="text-[12px] font-bold text-gray-400">Add your Measurement IDs to get crucial visitor-level data on your Google Analytics dashboard.</p>
+                                {/* Tracking IDs - only show if tracking toggle is ON */}
+                                {formData.trackingToggle && (
+                                    <div className="space-y-8 pt-6 animate-in slide-in-from-top-4 duration-500">
+                                        <div className="space-y-5">
+                                            <div className="space-y-1">
+                                                <h3 className="text-[14px] font-black text-gray-900">Meta Pixel</h3>
+                                                <p className="text-[12px] font-bold text-gray-400">Add your Meta Pixel IDs to get crucial visitor-level data.</p>
+                                            </div>
+                                            <input
+                                                className="w-full px-5 py-4 bg-white border border-gray-100 rounded-[16px] text-[13px] font-bold outline-none focus:border-black transition-all shadow-sm"
+                                                placeholder="Enter Pixel ID"
+                                                value={formData.metaPixelId || ""}
+                                                onChange={e => setFormData({ ...formData, metaPixelId: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-5">
+                                            <div className="space-y-1">
+                                                <h3 className="text-[14px] font-black text-gray-900">Google Analytics</h3>
+                                                <p className="text-[12px] font-bold text-gray-400">Add your Measurement IDs to track visitors.</p>
+                                            </div>
+                                            <input
+                                                className="w-full px-5 py-4 bg-white border border-gray-100 rounded-[16px] text-[13px] font-bold outline-none focus:border-black transition-all shadow-sm"
+                                                placeholder="G-XXXXXXXXXX"
+                                                value={formData.googleAnalyticsId || ""}
+                                                onChange={e => setFormData({ ...formData, googleAnalyticsId: e.target.value })}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Measurement ID</label>
-                                        <input
-                                            className="w-full px-5 py-4 bg-white border border-gray-100 rounded-[16px] text-[13px] font-bold outline-none focus:border-black transition-all shadow-sm"
-                                            placeholder="G-XXXXXXXXXX"
-                                            value={formData.googleAnalyticsId || ""}
-                                            onChange={e => setFormData({ ...formData, googleAnalyticsId: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     )}
