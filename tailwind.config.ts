@@ -11,9 +11,13 @@ const config: Config = {
             colors: {
                 background: "var(--background)",
                 foreground: "var(--foreground)",
+                primary: "#1a1a1a",
+                secondary: "#f4f4f5",
+                accent: "#d4a373", // Muted gold/beige for art vibes
             },
             fontFamily: {
-                sans: ["Inter", "sans-serif"],
+                sans: ["var(--font-sans)", "sans-serif"],
+                serif: ["var(--font-serif)", "serif"],
             },
         },
     },
